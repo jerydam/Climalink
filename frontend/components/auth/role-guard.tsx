@@ -7,7 +7,7 @@ import { useWeb3 } from "@/lib/web3"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2, Users, FileText, AlertCircle } from "lucide-react"
+import { Loader2, Users, FileText, AlertCircle, ShieldCheck } from "lucide-react"
 
 interface RoleGuardProps {
   children: ReactNode
@@ -16,7 +16,7 @@ interface RoleGuardProps {
 }
 
 export function RoleGuard({ children, requiredRole, fallbackPath = "/" }: RoleGuardProps) {
-  const { userRole, isLoading, joinAsReporter, joinAsDAO } = useRole()
+  const { userRole, isLoading, isMember, joinAsReporter, joinAsValidator, joinDAO, stakeBDAG } = useRole()
   const { isConnected } = useWeb3()
   const router = useRouter()
 
@@ -71,11 +71,25 @@ export function RoleGuard({ children, requiredRole, fallbackPath = "/" }: RoleGu
     return <JoinPrompt />
   }
 
+  // User has access
   return <>{children}</>
 }
 
 function AccessDenied({ userRole, requiredRoles }: { userRole: UserRole; requiredRoles: UserRole[] }) {
   const router = useRouter()
+
+  const getRoleDisplayName = (role: UserRole) => {
+    switch (role) {
+      case "dao_member":
+        return "DAO Member"
+      case "reporter":
+        return "Reporter"
+      case "validator":
+        return "Validator"
+      default:
+        return "No role"
+    }
+  }
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -85,9 +99,11 @@ function AccessDenied({ userRole, requiredRoles }: { userRole: UserRole; require
         </CardHeader>
         <CardContent className="text-center">
           <AlertCircle className="h-12 w-12 mx-auto mb-4 text-destructive" />
-          <p className="text-muted-foreground mb-4">
-            This page requires {requiredRoles.join(" or ")} access. Your current role:{" "}
-            {userRole === "none" ? "No role assigned" : userRole}
+          <p className="text-muted-foreground mb-2">
+            This page requires {requiredRoles.map(getRoleDisplayName).join(" or ")} access.
+          </p>
+          <p className="text-sm text-muted-foreground mb-4">
+            Your current role: {getRoleDisplayName(userRole)}
           </p>
           <div className="space-y-2">
             <Button onClick={() => router.push("/dashboard")} className="w-full">
@@ -104,24 +120,40 @@ function AccessDenied({ userRole, requiredRoles }: { userRole: UserRole; require
 }
 
 function JoinPrompt() {
-  const { joinAsReporter, joinAsDAO } = useRole()
+  const { joinAsReporter, joinAsValidator, joinDAO, stakeBDAG } = useRole()
   const router = useRouter()
 
   const handleJoinReporter = async () => {
     try {
       await joinAsReporter()
-      router.refresh()
+      // Refresh the page to update the role state
+      window.location.reload()
     } catch (error) {
       console.error("Failed to join as reporter:", error)
+      alert("Failed to join as reporter. Please try again.")
+    }
+  }
+
+  const handleJoinValidator = async () => {
+    try {
+      await joinAsValidator()
+      // Refresh the page to update the role state
+      window.location.reload()
+    } catch (error) {
+      console.error("Failed to join as validator:", error)
+      alert("Failed to join as validator. Please try again.")
     }
   }
 
   const handleJoinDAO = async () => {
     try {
-      await joinAsDAO()
-      router.refresh()
+      await stakeBDAG()
+      await joinDAO()
+      // Refresh the page to update the role state
+      window.location.reload()
     } catch (error) {
       console.error("Failed to join DAO:", error)
+      alert("Failed to join DAO. Make sure you have enough BDAG tokens to stake.")
     }
   }
 
@@ -133,7 +165,7 @@ function JoinPrompt() {
           <p className="text-muted-foreground">Choose your role to start participating in the ClimaLink ecosystem</p>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-6">
+        <div className="grid md:grid-cols-3 gap-6">
           <Card className="hover:shadow-lg transition-shadow">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -149,10 +181,33 @@ function JoinPrompt() {
                 <li>• Submit weather reports</li>
                 <li>• Earn CLT token rewards</li>
                 <li>• Access reporting dashboard</li>
-                <li>• View your submission history</li>
+                <li>• View submission history</li>
               </ul>
               <Button onClick={handleJoinReporter} className="w-full">
                 Join as Reporter
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="hover:shadow-lg transition-shadow">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ShieldCheck className="h-5 w-5 text-climate-green" />
+                Join as Validator
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground mb-4">
+                Review and validate weather reports to ensure data accuracy.
+              </p>
+              <ul className="text-sm text-muted-foreground mb-6 space-y-1">
+                <li>• Validate weather reports</li>
+                <li>• Earn validation rewards</li>
+                <li>• Maintain data quality</li>
+                <li>• Access validation dashboard</li>
+              </ul>
+              <Button onClick={handleJoinValidator} className="w-full">
+                Join as Validator
               </Button>
             </CardContent>
           </Card>
@@ -170,17 +225,17 @@ function JoinPrompt() {
               </p>
               <ul className="text-sm text-muted-foreground mb-6 space-y-1">
                 <li>• Vote on proposals</li>
-                <li>• Validate weather reports</li>
-                <li>• Create governance proposals</li>
+                <li>• Validate reports</li>
+                <li>• Create proposals</li>
                 <li>• Earn staking rewards</li>
               </ul>
               <Alert className="mb-4">
                 <AlertDescription className="text-xs">
-                  Requires minimum 1,000 CLT tokens for membership fee
+                  Requires staking BDAG tokens for membership
                 </AlertDescription>
               </Alert>
               <Button onClick={handleJoinDAO} className="w-full">
-                Join DAO
+                Stake & Join DAO
               </Button>
             </CardContent>
           </Card>

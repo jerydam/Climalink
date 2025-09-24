@@ -293,45 +293,6 @@ export default function LandingPage() {
 
       <footer className="bg-muted/50 py-16">
         <div className="container mx-auto px-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
-            <div className="md:col-span-1">
-              <h3 className="font-bold text-2xl mb-4 text-climate-gradient">ClimaLink</h3>
-              <p className="text-muted-foreground leading-relaxed mb-6">
-                The world's first decentralized climate reporting platform powered by blockchain technology and
-                community validation.
-              </p>
-              <div className="flex gap-4">{/* Social links would go here */}</div>
-            </div>
-
-            {[
-              {
-                title: "Platform",
-                links: ["Dashboard", "Submit Reports", "Validate Data", "DAO Governance"],
-              },
-              {
-                title: "Resources",
-                links: ["Documentation", "API Reference", "Community", "Support"],
-              },
-              {
-                title: "Connect",
-                links: ["Twitter", "Discord", "Telegram", "GitHub"],
-              },
-            ].map((section, index) => (
-              <div key={index}>
-                <h4 className="font-semibold text-lg mb-6">{section.title}</h4>
-                <ul className="space-y-3">
-                  {section.links.map((link, linkIndex) => (
-                    <li key={linkIndex}>
-                      <a href="#" className="text-muted-foreground hover:text-foreground transition-colors font-medium">
-                        {link}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-
           <div className="border-t border-border pt-8 text-center">
             <p className="text-muted-foreground">
               &copy; 2025 ClimaLink. All rights reserved. Built for a sustainable future.
