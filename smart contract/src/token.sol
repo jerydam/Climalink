@@ -35,7 +35,7 @@ contract ClimaLinkToken is ReentrancyGuard, Pausable, Ownable(msg.sender) {
     IBDAG public bdagToken;
     IClimaLinkDao public daoContract;
     uint256 public constant BDAG_STAKE_AMOUNT = 100 * 10**18; // 100 BDAG tokens
-    uint256 public constant STAKE_LOCK_PERIOD = 30 days;
+    uint256 public constant STAKE_LOCK_PERIOD = 60 days;
     uint256 public constant MINT_AMOUNT = 1000 * 10**18; // 1000 CLT tokens
     
     event Transfer(address indexed from, address indexed to, uint256 amount);

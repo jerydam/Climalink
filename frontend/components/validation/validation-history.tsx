@@ -2,7 +2,8 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { ChartBarIcon } from "@heroicons/react/24/outline"
+import { Progress } from "@/components/ui/progress"
+import { History, TrendingUp, Award, CheckCircle, XCircle } from "lucide-react"
 
 interface ValidationRecord {
   reportId: string
@@ -19,63 +20,117 @@ interface ValidationHistoryProps {
 
 export function ValidationHistory({ validations, accuracyRate, totalRewards }: ValidationHistoryProps) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center space-x-2">
-          <ChartBarIcon className="w-5 h-5" />
-          <span>Your Validation History</span>
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-6">
-          {/* Summary Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="text-center p-4 bg-primary/5 rounded-lg">
-              <div className="text-2xl font-bold text-primary">{accuracyRate}%</div>
-              <div className="text-sm text-muted-foreground">Accuracy Rate</div>
-              <div className="text-xs text-muted-foreground mt-1">
-                ({Math.floor((accuracyRate / 100) * validations.length)}/{validations.length} correct)
+    <div className="space-y-6">
+      {/* Stats Overview */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Accuracy Rate</p>
+                <p className="text-2xl font-bold text-climate-green">{accuracyRate}%</p>
+              </div>
+              <div className="w-12 h-12 bg-climate-green/10 rounded-full flex items-center justify-center">
+                <TrendingUp className="h-6 w-6 text-climate-green" />
               </div>
             </div>
-            <div className="text-center p-4 bg-secondary/5 rounded-lg">
-              <div className="text-2xl font-bold text-secondary">{totalRewards}</div>
-              <div className="text-sm text-muted-foreground">CLT Earned</div>
-              <div className="text-xs text-muted-foreground mt-1">Community Service</div>
+            <div className="mt-4">
+              <Progress value={accuracyRate} className="h-2" />
             </div>
-          </div>
+          </CardContent>
+        </Card>
 
-          {/* Validation Table */}
-          <div className="space-y-3">
-            <h4 className="font-medium">Recent Validations</h4>
-            <div className="space-y-2">
-              {validations.length > 0 ? (
-                validations.map((validation) => (
-                  <div
-                    key={validation.reportId}
-                    className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
-                  >
-                    <div className="flex items-center space-x-3">
-                      <span className="font-mono text-sm">#{validation.reportId}</span>
-                      <span className="text-sm">{validation.location}</span>
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Total Validations</p>
+                <p className="text-2xl font-bold">{validations.length}</p>
+              </div>
+              <div className="w-12 h-12 bg-blue-500/10 rounded-full flex items-center justify-center">
+                <History className="h-6 w-6 text-blue-500" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Rewards Earned</p>
+                <p className="text-2xl font-bold">{totalRewards} CLT</p>
+              </div>
+              <div className="w-12 h-12 bg-amber-500/10 rounded-full flex items-center justify-center">
+                <Award className="h-6 w-6 text-amber-500" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Validation History */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <History className="h-5 w-5" />
+            Recent Validations
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {validations.length > 0 ? (
+            <div className="space-y-4">
+              {validations.map((validation, index) => (
+                <div
+                  key={`${validation.reportId}-${index}`}
+                  className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors"
+                >
+                  <div className="flex items-center space-x-3">
+                    <div
+                      className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                        validation.decision === "valid"
+                          ? "bg-climate-green/10 text-climate-green"
+                          : "bg-red-500/10 text-red-500"
+                      }`}
+                    >
+                      {validation.decision === "valid" ? (
+                        <CheckCircle className="h-4 w-4" />
+                      ) : (
+                        <XCircle className="h-4 w-4" />
+                      )}
                     </div>
-                    <div className="flex items-center space-x-3">
-                      <Badge variant={validation.decision === "valid" ? "default" : "destructive"}>
-                        {validation.decision === "valid" ? "✅ Valid" : "❌ Invalid"}
-                      </Badge>
-                      <span className="text-xs text-muted-foreground">{validation.date}</span>
+                    <div>
+                      <p className="font-medium">Report #{validation.reportId}</p>
+                      <p className="text-sm text-muted-foreground">{validation.location}</p>
                     </div>
                   </div>
-                ))
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  <p>No validations yet</p>
-                  <p className="text-sm">Start validating reports to build your history</p>
+                  <div className="flex items-center space-x-3">
+                    <Badge
+                      variant={validation.decision === "valid" ? "default" : "destructive"}
+                      className={
+                        validation.decision === "valid"
+                          ? "bg-climate-green hover:bg-climate-green/80"
+                          : ""
+                      }
+                    >
+                      {validation.decision === "valid" ? "Valid" : "Invalid"}
+                    </Badge>
+                    <p className="text-sm text-muted-foreground">{validation.date}</p>
+                  </div>
                 </div>
-              )}
+              ))}
             </div>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+          ) : (
+            <div className="text-center py-8">
+              <History className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+              <p className="text-muted-foreground">No validation history yet</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Start validating reports to see your history here
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   )
 }

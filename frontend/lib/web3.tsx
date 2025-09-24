@@ -1,6 +1,8 @@
 "use client"
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react"
+import { ethers } from "ethers"
+import { CONTRACTS } from "@/lib/contracts"
 
 declare global {
   interface Window {
@@ -12,9 +14,11 @@ interface Web3ContextType {
   account: string | null
   isConnected: boolean
   isConnecting: boolean
+  provider: ethers.BrowserProvider | null
+  signer: ethers.Signer | null
   connect: () => Promise<void>
   disconnect: () => void
-  getContract: (contractName: string) => any
+  getContract: (contractName: keyof typeof CONTRACTS) => ethers.Contract
   sendTransaction: (to: string, data: string, value?: string) => Promise<string>
 }
 
@@ -23,6 +27,8 @@ const Web3Context = createContext<Web3ContextType | undefined>(undefined)
 export function Web3Provider({ children }: { children: ReactNode }) {
   const [account, setAccount] = useState<string | null>(null)
   const [isConnecting, setIsConnecting] = useState(false)
+  const [provider, setProvider] = useState<ethers.BrowserProvider | null>(null)
+  const [signer, setSigner] = useState<ethers.Signer | null>(null)
 
   const isConnected = !!account
 
@@ -34,10 +40,15 @@ export function Web3Provider({ children }: { children: ReactNode }) {
 
     setIsConnecting(true)
     try {
-      const accounts = await window.ethereum.request({
-        method: "eth_requestAccounts",
-      })
-      setAccount(accounts[0])
+      const browserProvider = new ethers.BrowserProvider(window.ethereum)
+      await browserProvider.send("eth_requestAccounts", [])
+      
+      const userSigner = await browserProvider.getSigner()
+      const address = await userSigner.getAddress()
+      
+      setProvider(browserProvider)
+      setSigner(userSigner)
+      setAccount(address)
     } catch (error) {
       console.error("Failed to connect wallet:", error)
     } finally {
@@ -47,70 +58,65 @@ export function Web3Provider({ children }: { children: ReactNode }) {
 
   const disconnect = () => {
     setAccount(null)
+    setProvider(null)
+    setSigner(null)
   }
 
-  const getContract = (contractName: string) => {
-    // Mock contract interface for demo
-    return {
-      read: async (method: string, params: any[] = []) => {
-        console.log(`Reading ${method} from ${contractName}`, params)
-        // Return mock data based on method
-        switch (method) {
-          case "balanceOf":
-            return "1520000000000000000000" // 1520 CLT
-          case "getStakedAmount":
-            return "100000000000000000000" // 100 BDAG
-          case "isDaoMember":
-            // Mock: return true for demo purposes (in real app, check blockchain)
-            return true
-          case "isReporter":
-            // Mock: return false to show DAO member status
-            return false
-          default:
-            return "0"
-        }
-      },
-      write: async (method: string, params: any[] = []) => {
-        console.log(`Writing ${method} to ${contractName}`, params)
-        // Mock responses for join functions
-        if (method === "joinAsReporter" || method === "joinDao") {
-          // Simulate successful transaction
-          return "0x1234567890abcdef"
-        }
-        return "0x1234567890abcdef"
-      },
+  const getContract = (contractName: keyof typeof CONTRACTS) => {
+    if (!provider || !signer) {
+      throw new Error("Provider not connected")
     }
+
+    const contractConfig = CONTRACTS[contractName]
+    return new ethers.Contract(contractConfig.address, contractConfig.abi, signer)
   }
 
   const sendTransaction = async (to: string, data: string, value = "0") => {
-    if (!window.ethereum || !account) {
+    if (!signer || !account) {
       throw new Error("Wallet not connected")
     }
 
-    const txHash = await window.ethereum.request({
-      method: "eth_sendTransaction",
-      params: [
-        {
-          from: account,
-          to,
-          data,
-          value,
-        },
-      ],
+    const tx = await signer.sendTransaction({
+      to,
+      data,
+      value: ethers.parseEther(value),
     })
 
-    return txHash
+    return tx.hash
   }
 
   useEffect(() => {
     if (window.ethereum) {
       window.ethereum.on("accountsChanged", (accounts: string[]) => {
-        setAccount(accounts[0] || null)
+        if (accounts.length === 0) {
+          disconnect()
+        } else {
+          setAccount(accounts[0])
+        }
       })
 
       window.ethereum.on("chainChanged", () => {
         window.location.reload()
       })
+
+      // Check if already connected
+      const checkConnection = async () => {
+        try {
+          const browserProvider = new ethers.BrowserProvider(window.ethereum)
+          const accounts = await browserProvider.listAccounts()
+          if (accounts.length > 0) {
+            const userSigner = await browserProvider.getSigner()
+            const address = await userSigner.getAddress()
+            setProvider(browserProvider)
+            setSigner(userSigner)
+            setAccount(address)
+          }
+        } catch (error) {
+          console.error("Error checking connection:", error)
+        }
+      }
+
+      checkConnection()
     }
   }, [])
 
@@ -120,6 +126,8 @@ export function Web3Provider({ children }: { children: ReactNode }) {
         account,
         isConnected,
         isConnecting,
+        provider,
+        signer,
         connect,
         disconnect,
         getContract,

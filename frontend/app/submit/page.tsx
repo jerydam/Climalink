@@ -1,13 +1,19 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { MainNav } from "@/components/navigation/main-nav"
 import { MobileNav } from "@/components/navigation/mobile-nav"
 import { LocationInput } from "@/components/submit/location-input"
 import { WeatherForm } from "@/components/submit/weather-form"
 import { SubmissionSummary } from "@/components/submit/submission-summary"
+import { TransactionModal } from "@/components/blockchain/transaction-modal"
 import { Button } from "@/components/ui/button"
 import { ArrowLeftIcon } from "@heroicons/react/24/outline"
+import { useRole } from "@/lib/roles"
+import { useWeb3 } from "@/lib/web3"
+import { Card, CardContent } from "@/components/ui/card"
+import { Loader2, UserPlus, ShieldCheck } from "lucide-react"
 
 interface WeatherData {
   temperature: number
@@ -15,6 +21,65 @@ interface WeatherData {
   weather: string
   notes: string
   photo?: File
+}
+
+function AccessDenied() {
+  const { joinAsReporter, joinAsValidator } = useRole()
+
+  return (
+    <div className="min-h-screen bg-background">
+      <MainNav />
+      <main className="container mx-auto px-4 py-8">
+        <div className="max-w-2xl mx-auto">
+          <Card>
+            <CardContent className="p-8 text-center">
+              <div className="w-16 h-16 bg-climate-gradient rounded-full flex items-center justify-center mx-auto mb-4">
+                <ShieldCheck className="h-8 w-8 text-white" />
+              </div>
+              <h1 className="text-2xl font-bold mb-4">Reporter Access Required</h1>
+              <p className="text-muted-foreground mb-6">
+                You need to be registered as a reporter to submit climate reports. Please join as a reporter or validator to continue.
+              </p>
+              
+              <div className="grid gap-4">
+                <Button 
+                  onClick={joinAsReporter} 
+                  className="bg-climate-green hover:bg-climate-green/90"
+                >
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Join as Reporter
+                </Button>
+                
+                <Button 
+                  onClick={joinAsValidator}
+                  variant="outline"
+                >
+                  <ShieldCheck className="h-4 w-4 mr-2" />
+                  Join as Validator
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </main>
+    </div>
+  )
+}
+
+function LoadingPage() {
+  return (
+    <div className="min-h-screen bg-background">
+      <MainNav />
+      <main className="container mx-auto px-4 py-8">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+            <p className="text-muted-foreground">Checking your access permissions...</p>
+          </div>
+        </div>
+      </main>
+    </div>
+  )
 }
 
 export default function SubmitReportPage() {
@@ -27,6 +92,18 @@ export default function SubmitReportPage() {
     weather: "sunny",
     notes: "",
   })
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [showTransactionModal, setShowTransactionModal] = useState(false)
+
+  const { isConnected, getContract } = useWeb3()
+  const { userRole, isLoading, isMember } = useRole()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (!isConnected) {
+      router.push("/")
+    }
+  }, [isConnected, router])
 
   const handleLocationChange = (newLocation: string, newCoordinates: { lat: number; lng: number }) => {
     setLocation(newLocation)
@@ -46,17 +123,50 @@ export default function SubmitReportPage() {
   }
 
   const handleSubmit = () => {
-    // Handle report submission
-    console.log("Submitting report:", {
-      location,
-      coordinates,
-      ...weatherData,
-    })
-    // Redirect to dashboard or success page
+    setShowTransactionModal(true)
+  }
+
+  const handleConfirmTransaction = async () => {
+    setIsSubmitting(true)
+    
+    try {
+      const climateContract = getContract("CLIMATE")
+      
+      // Prepare report data
+      const reportInput = {
+        weather: weatherData.weather,
+        temperature: Math.round(weatherData.temperature * 100), // Convert to int128 format
+        humidity: weatherData.humidity,
+        location: location,
+        longitude: Math.round(coordinates.lng * 1000000), // Convert to int128 format
+        latitude: Math.round(coordinates.lat * 1000000), // Convert to int128 format
+      }
+
+      // Submit the climate report
+      const tx = await climateContract.createClimateReport(reportInput)
+      await tx.wait()
+
+      // Success - redirect to dashboard
+      router.push("/dashboard?success=report_submitted")
+    } catch (error) {
+      console.error("Error submitting report:", error)
+      throw error
+    } finally {
+      setIsSubmitting(false)
+      setShowTransactionModal(false)
+    }
   }
 
   const handleEdit = () => {
     setStep(2)
+  }
+
+  if (isLoading) {
+    return <LoadingPage />
+  }
+
+  if (!isMember || (userRole !== "reporter" && userRole !== "validator" && userRole !== "dao_member")) {
+    return <AccessDenied />
   }
 
   return (
@@ -132,6 +242,15 @@ export default function SubmitReportPage() {
       </main>
 
       <MobileNav />
+
+      {/* Transaction Modal */}
+      <TransactionModal
+        isOpen={showTransactionModal}
+        onClose={() => setShowTransactionModal(false)}
+        title="Submit Climate Report"
+        description="This will submit your weather report to the blockchain and make it available for community validation."
+        onConfirm={handleConfirmTransaction}
+      />
     </div>
   )
 }
