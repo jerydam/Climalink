@@ -13,6 +13,10 @@ interface IClimaLinkToken {
     function getStakedAmount(address user) external view returns (uint256);
 }
 
+interface IClimaLinkClimate {
+    function notifyDaoMembership(address newMember) external returns (bool);
+}
+
 contract ClimaLinkDao is ReentrancyGuard, Pausable, Ownable(msg.sender) {
     using SafeMath for uint256;
     
@@ -67,6 +71,7 @@ contract ClimaLinkDao is ReentrancyGuard, Pausable, Ownable(msg.sender) {
     uint256 public constant MINIMUM_STAKE = 100 * 10**18; // 100 BDAG tokens
     
     IClimaLinkToken public tokenContract;
+    IClimaLinkClimate public climateContract;
     
     event MemberJoined(address indexed member, uint128 memberId);
     event MemberLeft(address indexed member);
@@ -77,6 +82,8 @@ contract ClimaLinkDao is ReentrancyGuard, Pausable, Ownable(msg.sender) {
     event MemberBlacklisted(address indexed member, bool status);
     event MemberRemovedOnUnstake(address indexed member);
     event TokenContractUpdated(address indexed newTokenContract);
+    event ClimateContractUpdated(address indexed newClimateContract);
+    event MemberAutoUpgraded(address indexed member, bool success);
     
     modifier onlyMember() {
         require(isMember[msg.sender] && !blacklisted[msg.sender], "Not an active member");
@@ -110,6 +117,15 @@ contract ClimaLinkDao is ReentrancyGuard, Pausable, Ownable(msg.sender) {
     }
     
     /**
+     * @dev Set the climate contract address (only owner)
+     */
+    function setClimateContract(address _climateContract) external onlyOwner {
+        require(_climateContract != address(0), "Invalid climate contract address");
+        climateContract = IClimaLinkClimate(_climateContract);
+        emit ClimateContractUpdated(_climateContract);
+    }
+    
+    /**
      * @dev Join the DAO by paying membership fee
      */
     function joinDao() external nonReentrant whenNotPaused notBlacklisted returns (uint128) {
@@ -136,6 +152,17 @@ contract ClimaLinkDao is ReentrancyGuard, Pausable, Ownable(msg.sender) {
         membersCount = id;
         
         emit MemberJoined(msg.sender, id);
+        
+        // Notify climate contract about new DAO member for potential auto-upgrade
+        if (address(climateContract) != address(0)) {
+            try climateContract.notifyDaoMembership(msg.sender) returns (bool success) {
+                emit MemberAutoUpgraded(msg.sender, success);
+            } catch {
+                // Silently fail if climate contract is not available or call fails
+                // This ensures DAO functionality doesn't break if climate contract has issues
+            }
+        }
+        
         return id;
     }
     
