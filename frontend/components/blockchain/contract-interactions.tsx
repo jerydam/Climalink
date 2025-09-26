@@ -21,6 +21,7 @@ interface UserStats {
   daoVotes: number
   isDaoMember: boolean
   memberSince: string
+  isEligibleForMinting: boolean
 }
 
 export function ContractInteractions() {
@@ -39,6 +40,7 @@ export function ContractInteractions() {
     daoVotes: 0,
     isDaoMember: false,
     memberSince: "N/A",
+    isEligibleForMinting: false,
   })
   
   const [isLoading, setIsLoading] = useState(true)
@@ -62,11 +64,12 @@ export function ContractInteractions() {
       const climateContract = getContract("CLIMATE")
       const daoContract = getContract("DAO")
 
-      // Fetch basic balances
-      const [cltBalance, stakedAmount, unlockTime] = await Promise.all([
+      // Fetch basic balances and staking info
+      const [cltBalance, stakedAmount, unlockTime, isEligibleForMinting] = await Promise.all([
         tokenContract.balanceOf(account),
         tokenContract.getStakedAmount(account),
         tokenContract.getUnlockTime(account),
+        tokenContract.isEligibleForMinting(account),
       ])
 
       const cltFormatted = ethers.formatEther(cltBalance)
@@ -85,46 +88,72 @@ export function ContractInteractions() {
       let daoVotes = 0
       let memberSince = "N/A"
 
-      // Count user's reports
-      const reportCount = await climateContract.reportCount()
-      for (let i = 0; i < Math.min(Number(reportCount), 200); i++) {
+      // Count user's reports using events (more efficient than iterating)
+      try {
+        const reportEvents = await climateContract.queryFilter(
+          climateContract.filters.ClimateEvent(),
+          fromBlock,
+          currentBlock
+        )
+        
+        // Filter for reports by this user
+        for (const event of reportEvents) {
+          try {
+            const reportIndex = event.args?.[0]
+            if (reportIndex) {
+              const report = await climateContract.getClimateReport(reportIndex)
+              if (report.reporter.toLowerCase() === account.toLowerCase()) {
+                reportsSubmitted++
+                if (report.status === 1) { // ReportStatus.Validated
+                  validReports++
+                }
+              }
+            }
+          } catch (error) {
+            continue
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching report events:", error)
+        // Fallback: check recent reports directly
         try {
-          const report = await climateContract.reports(i)
-          if (report.reporter.toLowerCase() === account.toLowerCase()) {
-            reportsSubmitted++
-            if (report.status === 1) { // Valid report
-              validReports++
+          const reportCount = await climateContract.reportCount()
+          const maxCheck = Math.min(Number(reportCount), 50) // Check last 50 reports only
+          for (let i = Math.max(1, Number(reportCount) - maxCheck + 1); i <= Number(reportCount); i++) {
+            try {
+              const report = await climateContract.getClimateReport(i)
+              if (report.reporter.toLowerCase() === account.toLowerCase()) {
+                reportsSubmitted++
+                if (report.status === 1) { // ReportStatus.Validated
+                  validReports++
+                }
+              }
+            } catch (error) {
+              continue
             }
           }
         } catch (error) {
-          continue
+          console.error("Error with fallback report counting:", error)
         }
       }
 
       // Count validations performed (if validator or DAO member)
       if (userRole === "validator" || userRole === "dao_member") {
         try {
-          const [validatedEvents, rejectedEvents] = await Promise.all([
-            climateContract.queryFilter(
-              climateContract.filters.ReportValidated(null, account),
-              fromBlock,
-              currentBlock
-            ),
-            climateContract.queryFilter(
-              climateContract.filters.ReportRejected(null, account),
-              fromBlock,
-              currentBlock
-            )
-          ])
+          const validationEvents = await climateContract.queryFilter(
+            climateContract.filters.ReportVoteCast(null, account),
+            fromBlock,
+            currentBlock
+          )
           
-          validationsPerformed = validatedEvents.length + rejectedEvents.length
+          validationsPerformed = validationEvents.length
         } catch (error) {
           console.error("Error fetching validation events:", error)
         }
       }
 
       // Count DAO votes (if DAO member)
-      if (userRole === "dao_member") {
+      if (isDaoMember) {
         try {
           const voteEvents = await daoContract.queryFilter(
             daoContract.filters.VoteCast(null, account),
@@ -134,7 +163,7 @@ export function ContractInteractions() {
           
           daoVotes = voteEvents.length
         } catch (error) {
-          console.error("Error fetching vote events:", error)
+          console.error("Error fetching DAO vote events:", error)
         }
       }
 
@@ -148,8 +177,10 @@ export function ContractInteractions() {
 
         if (stakeEvents.length > 0) {
           const firstEvent = stakeEvents[0]
-          const block = await firstEvent.getBlock()
-          memberSince = new Date(Number(block.timestamp) * 1000).toLocaleDateString()
+          const block = await provider.getBlock(firstEvent.blockNumber)
+          if (block) {
+            memberSince = new Date(Number(block.timestamp) * 1000).toLocaleDateString()
+          }
         }
       } catch (error) {
         console.error("Error fetching member since date:", error)
@@ -171,6 +202,7 @@ export function ContractInteractions() {
         daoVotes,
         isDaoMember,
         memberSince,
+        isEligibleForMinting,
       })
       
       setLastUpdated(new Date())
@@ -197,6 +229,13 @@ export function ContractInteractions() {
     return Math.round((stats.validReports / stats.reportsSubmitted) * 100)
   }
 
+  const getStakingStatus = () => {
+    const stakedAmount = parseFloat(stats.stakedBDAG)
+    if (stakedAmount === 0) return { status: "Not Staked", color: "text-muted-foreground" }
+    if (stakedAmount >= 100) return { status: "Active", color: "text-climate-green" }
+    return { status: "Insufficient", color: "text-amber-500" }
+  }
+
   if (!isConnected) {
     return (
       <Card>
@@ -211,6 +250,8 @@ export function ContractInteractions() {
       </Card>
     )
   }
+
+  const stakingStatus = getStakingStatus()
 
   return (
     <div className="space-y-6">
@@ -253,7 +294,14 @@ export function ContractInteractions() {
             ) : (
               <>
                 <div className="text-2xl font-bold">{stats.cltBalance}</div>
-                <p className="text-xs text-muted-foreground">≈ ${stats.cltBalanceUSD}</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-xs text-muted-foreground">≈ ${stats.cltBalanceUSD}</p>
+                  {stats.isEligibleForMinting && (
+                    <Badge variant="outline" className="text-xs bg-climate-green/10 text-climate-green">
+                      Eligible
+                    </Badge>
+                  )}
+                </div>
               </>
             )}
           </CardContent>
@@ -276,12 +324,18 @@ export function ContractInteractions() {
                 <div className="text-2xl font-bold">{stats.stakedBDAG}</div>
                 <div className="flex items-center gap-2">
                   <p className="text-xs text-muted-foreground">≈ ${stats.stakedBDAGUSD}</p>
-                  {getDaysUntilUnlock() > 0 && (
-                    <Badge variant="outline" className="text-xs">
-                      {getDaysUntilUnlock()}d left
-                    </Badge>
-                  )}
+                  <Badge 
+                    variant="outline" 
+                    className={`text-xs ${stakingStatus.color}`}
+                  >
+                    {stakingStatus.status}
+                  </Badge>
                 </div>
+                {getDaysUntilUnlock() > 0 && (
+                  <p className="text-xs text-amber-500 mt-1">
+                    Locked for {getDaysUntilUnlock()} more days
+                  </p>
+                )}
               </>
             )}
           </CardContent>
@@ -307,13 +361,13 @@ export function ContractInteractions() {
                 <div className="flex items-center gap-2">
                   <Badge
                     variant={stats.isDaoMember ? "default" : "secondary"}
-                    className={stats.isDaoMember ? "bg-climate-green" : ""}
+                    className={stats.isDaoMember ? "bg-purple-500" : ""}
                   >
                     {stats.isDaoMember ? "Active" : "Inactive"}
                   </Badge>
                   {stats.daoVotes > 0 && (
                     <span className="text-xs text-muted-foreground">
-                      {stats.daoVotes} votes
+                      {stats.daoVotes} votes cast
                     </span>
                   )}
                 </div>
@@ -338,10 +392,12 @@ export function ContractInteractions() {
               <>
                 <div className="text-2xl font-bold">{stats.reportsSubmitted}</div>
                 <div className="flex items-center gap-2">
-                  <p className="text-xs text-muted-foreground">Submitted</p>
+                  <p className="text-xs text-muted-foreground">
+                    {stats.validReports} validated
+                  </p>
                   {stats.reportsSubmitted > 0 && (
                     <Badge variant="outline" className="text-xs">
-                      {getReportAccuracy()}% valid
+                      {getReportAccuracy()}% accuracy
                     </Badge>
                   )}
                 </div>
@@ -362,23 +418,30 @@ export function ContractInteractions() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{stats.validationsPerformed}</div>
-                <p className="text-xs text-muted-foreground">Reports Validated</p>
+                <p className="text-xs text-muted-foreground">Reports Validated (24h periods)</p>
               </CardContent>
             </Card>
           )}
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Role</CardTitle>
+              <CardTitle className="text-sm font-medium">Role Status</CardTitle>
               <TrendingUp className="h-4 w-4 text-green-500" />
             </CardHeader>
             <CardContent>
               <div className="text-lg font-bold capitalize">
                 {userRole.replace("_", " ")}
               </div>
-              <p className="text-xs text-muted-foreground">
-                Since: {stats.memberSince}
-              </p>
+              <div className="flex items-center gap-2">
+                <p className="text-xs text-muted-foreground">
+                  Since: {stats.memberSince}
+                </p>
+                {userRole === "reporter" && stats.isDaoMember && (
+                  <Badge variant="outline" className="text-xs text-amber-500">
+                    Upgrade Available
+                  </Badge>
+                )}
+              </div>
             </CardContent>
           </Card>
 
@@ -391,10 +454,30 @@ export function ContractInteractions() {
               <div className="text-2xl font-bold">
                 {stats.reportsSubmitted + stats.validationsPerformed + stats.daoVotes}
               </div>
-              <p className="text-xs text-muted-foreground">Total Actions</p>
+              <p className="text-xs text-muted-foreground">
+                Total Platform Actions
+              </p>
             </CardContent>
           </Card>
         </div>
+      )}
+
+      {/* Staking Requirements Alert */}
+      {parseFloat(stats.stakedBDAG) < 100 && (
+        <Card className="border-amber-200 bg-amber-50">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="h-2 w-2 bg-amber-500 rounded-full"></div>
+              <div>
+                <p className="font-medium text-amber-800">Staking Required</p>
+                <p className="text-sm text-amber-700">
+                  Stake 100 BDAG tokens to access platform features and earn CLT rewards. 
+                  You'll receive 1000 CLT tokens immediately upon staking.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       )}
     </div>
   )

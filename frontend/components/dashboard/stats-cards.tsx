@@ -3,8 +3,10 @@
 import { useEffect, useState } from "react"
 import { cn } from "@/lib/utils"
 import { Card, CardContent } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 import { CurrencyDollarIcon, LockClosedIcon, DocumentTextIcon, TrophyIcon } from "@heroicons/react/24/outline"
 import { useWeb3 } from "@/lib/web3"
+import { useRole } from "@/lib/roles"
 import { ethers } from "ethers"
 import { Loader2 } from "lucide-react"
 
@@ -14,7 +16,9 @@ interface StatsData {
   bdagStaked: string
   reportsSubmitted: number
   validReports: number
-  rewardsEarned: string
+  totalEarned: string
+  isEligibleForMinting: boolean
+  unlockDays: number
 }
 
 export function StatsCards() {
@@ -24,14 +28,17 @@ export function StatsCards() {
     bdagStaked: "0",
     reportsSubmitted: 0,
     validReports: 0,
-    rewardsEarned: "0",
+    totalEarned: "0",
+    isEligibleForMinting: false,
+    unlockDays: 0,
   })
   const [isLoading, setIsLoading] = useState(true)
-  const { account, isConnected, getContract } = useWeb3()
+  const { account, isConnected, getContract, provider } = useWeb3()
+  const { userRole } = useRole()
 
   useEffect(() => {
     const fetchStats = async () => {
-      if (!isConnected || !account) {
+      if (!isConnected || !account || !provider) {
         setIsLoading(false)
         return
       }
@@ -41,39 +48,90 @@ export function StatsCards() {
         const tokenContract = getContract("TOKEN")
         const climateContract = getContract("CLIMATE")
 
-        // Fetch CLT balance
-        const cltBalance = await tokenContract.balanceOf(account)
-        const cltFormatted = ethers.formatEther(cltBalance)
+        // Fetch CLT balance and staking info
+        const [cltBalance, bdagStaked, unlockTime, isEligibleForMinting] = await Promise.all([
+          tokenContract.balanceOf(account),
+          tokenContract.getStakedAmount(account),
+          tokenContract.getUnlockTime(account),
+          tokenContract.isEligibleForMinting(account),
+        ])
 
-        // Fetch BDAG staked amount
-        const bdagStaked = await tokenContract.getStakedAmount(account)
+        const cltFormatted = ethers.formatEther(cltBalance)
         const bdagFormatted = ethers.formatEther(bdagStaked)
 
-        // Calculate reports statistics
-        const reportCount = await climateContract.reportCount()
+        // Calculate unlock days remaining
+        const now = Math.floor(Date.now() / 1000)
+        const unlockTimestamp = Number(unlockTime)
+        const unlockDays = unlockTimestamp > 0 ? Math.max(0, Math.ceil((unlockTimestamp - now) / (24 * 60 * 60))) : 0
+
+        // Get current block for events
+        const currentBlock = await provider.getBlockNumber()
+        const fromBlock = Math.max(0, currentBlock - 50000) // Look back further for comprehensive stats
+
+        // Calculate user reports and total earnings
         let userReportsSubmitted = 0
         let validUserReports = 0
-        let totalRewards = BigInt(0)
+        let totalEarned = 0
 
-        // Iterate through reports to find user's reports
-        // Note: In a production app, you'd want to use events or indexed queries for efficiency
-        for (let i = 0; i < Math.min(Number(reportCount), 100); i++) { // Limit to avoid gas issues
+        try {
+          // More efficient approach: use events instead of iterating through all reports
+          const reportEvents = await climateContract.queryFilter(
+            climateContract.filters.ClimateEvent(),
+            fromBlock,
+            currentBlock
+          )
+
+          // Check which reports belong to this user
+          for (const event of reportEvents) {
+            try {
+              const reportIndex = event.args?.[0]
+              if (reportIndex) {
+                const report = await climateContract.getClimateReport(reportIndex)
+                if (report.reporter.toLowerCase() === account.toLowerCase()) {
+                  userReportsSubmitted++
+                  if (report.status === 1) { // ReportStatus.Validated
+                    validUserReports++
+                    totalEarned += 20 // 20 CLT per validated report
+                  }
+                }
+              }
+            } catch (error) {
+              continue // Skip invalid report indices
+            }
+          }
+        } catch (error) {
+          console.error("Error fetching report events:", error)
+          
+          // Fallback to direct contract calls for recent reports
           try {
-            const report = await climateContract.reports(i)
-            if (report.reporter.toLowerCase() === account.toLowerCase()) {
-              userReportsSubmitted++
-              if (report.status === 1) { // Assuming 1 = Valid status
-                validUserReports++
-                totalRewards += await tokenContract.REPORT_REWARD() // Add report reward
+            const reportCount = await climateContract.reportCount()
+            const maxCheck = Math.min(Number(reportCount), 20) // Check last 20 reports only
+            
+            for (let i = Math.max(1, Number(reportCount) - maxCheck + 1); i <= Number(reportCount); i++) {
+              try {
+                const report = await climateContract.getClimateReport(i)
+                if (report.reporter.toLowerCase() === account.toLowerCase()) {
+                  userReportsSubmitted++
+                  if (report.status === 1) {
+                    validUserReports++
+                    totalEarned += 20
+                  }
+                }
+              } catch (error) {
+                continue
               }
             }
-          } catch (error) {
-            // Skip if report doesn't exist or error occurs
-            continue
+          } catch (fallbackError) {
+            console.error("Fallback report fetching failed:", fallbackError)
           }
         }
 
-        // Mock USD conversion (in production, fetch from oracle or API)
+        // Add initial staking bonus to total earned if user has staked
+        if (parseFloat(bdagFormatted) >= 100) {
+          totalEarned += 1000 // Initial 1000 CLT from staking
+        }
+
+        // Mock USD conversion (in production, fetch from oracle/API)
         const cltPriceUSD = 0.10 // $0.10 per CLT
         const cltBalanceUSD = (parseFloat(cltFormatted) * cltPriceUSD).toFixed(2)
 
@@ -83,18 +141,24 @@ export function StatsCards() {
           bdagStaked: parseFloat(bdagFormatted).toFixed(0),
           reportsSubmitted: userReportsSubmitted,
           validReports: validUserReports,
-          rewardsEarned: ethers.formatEther(totalRewards),
+          totalEarned: totalEarned.toString(),
+          isEligibleForMinting,
+          unlockDays,
         })
       } catch (error) {
         console.error("Error fetching stats:", error)
-        // Keep default values on error
       } finally {
         setIsLoading(false)
       }
     }
 
     fetchStats()
-  }, [account, isConnected, getContract])
+  }, [account, isConnected, getContract, provider])
+
+  const getReportAccuracy = () => {
+    if (stats.reportsSubmitted === 0) return 0
+    return Math.round((stats.validReports / stats.reportsSubmitted) * 100)
+  }
 
   const statsConfig = [
     {
@@ -103,31 +167,41 @@ export function StatsCards() {
       unit: "CLT",
       subtitle: `≈ $${stats.cltBalanceUSD}`,
       icon: CurrencyDollarIcon,
-      color: "text-primary",
+      color: "text-climate-green",
+      badge: stats.isEligibleForMinting ? { text: "Eligible", color: "bg-climate-green/10 text-climate-green" } : null,
     },
     {
       title: "BDAG Staked",
       value: stats.bdagStaked,
-      unit: "BDAG",
-      subtitle: "(Locked)",
+      unit: "BDAG", 
+      subtitle: stats.unlockDays > 0 ? `Locked ${stats.unlockDays} days` : parseFloat(stats.bdagStaked) >= 100 ? "Active" : "Inactive",
       icon: LockClosedIcon,
-      color: "text-secondary",
+      color: "text-sky-blue",
+      badge: parseFloat(stats.bdagStaked) >= 100 ? 
+        { text: "Staked", color: "bg-sky-blue/10 text-sky-blue" } : 
+        { text: "Need 100", color: "bg-amber-100 text-amber-800" },
     },
     {
-      title: "Reports Submitted",
+      title: "Weather Reports",
       value: stats.reportsSubmitted.toString(),
       unit: "",
-      subtitle: `${stats.validReports} Valid`,
+      subtitle: `${stats.validReports} validated • ${getReportAccuracy()}% accuracy`,
       icon: DocumentTextIcon,
-      color: "text-success",
+      color: "text-green-600",
+      badge: stats.reportsSubmitted > 0 ? 
+        { text: `${getReportAccuracy()}% valid`, color: getReportAccuracy() >= 80 ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800" } : 
+        null,
     },
     {
-      title: "Rewards Earned",
-      value: parseFloat(stats.rewardsEarned).toFixed(0),
+      title: "Total Earned",
+      value: stats.totalEarned,
       unit: "CLT",
-      subtitle: "This Month",
+      subtitle: userRole === "reporter" ? "From reports + staking" : "Platform rewards",
       icon: TrophyIcon,
-      color: "text-warning",
+      color: "text-amber-500",
+      badge: parseInt(stats.totalEarned) >= 1000 ? 
+        { text: "1K+ Club", color: "bg-amber-100 text-amber-800" } : 
+        null,
     },
   ]
 
@@ -138,7 +212,14 @@ export function StatsCards() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div className="flex-1">
-                <p className="text-sm font-medium text-muted-foreground">{stat.title}</p>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-medium text-muted-foreground">{stat.title}</p>
+                  {stat.badge && (
+                    <Badge className={cn("text-xs", stat.badge.color)}>
+                      {stat.badge.text}
+                    </Badge>
+                  )}
+                </div>
                 <div className="flex items-baseline space-x-1 mt-2">
                   {isLoading ? (
                     <div className="flex items-center space-x-2">

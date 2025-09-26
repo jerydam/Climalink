@@ -5,8 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Lock, Plus, AlertTriangle, Loader2 } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { Lock, Plus, AlertTriangle, Loader2, Clock, Coins } from "lucide-react"
 import { useWeb3 } from "@/lib/web3"
+import { TransactionModal } from "@/components/blockchain/transaction-modal"
 import { ethers } from "ethers"
 
 interface StakingData {
@@ -14,10 +16,12 @@ interface StakingData {
   stakeDate: string
   unlockDate: string
   unlockTime: number
-  availableToStake: string
+  availableBalance: string
   stakeLockPeriod: number
   minimumStake: string
   isStakeActive: boolean
+  autoMintAmount: string
+  isEligibleForMinting: boolean
 }
 
 export function StakingDashboard() {
@@ -26,14 +30,16 @@ export function StakingDashboard() {
     stakeDate: "",
     unlockDate: "",
     unlockTime: 0,
-    availableToStake: "0",
+    availableBalance: "0",
     stakeLockPeriod: 0,
     minimumStake: "0",
     isStakeActive: false,
+    autoMintAmount: "0",
+    isEligibleForMinting: false,
   })
   const [isLoading, setIsLoading] = useState(true)
-  const [isStaking, setIsStaking] = useState(false)
-  const [isUnstaking, setIsUnstaking] = useState(false)
+  const [showStakeModal, setShowStakeModal] = useState(false)
+  const [showUnstakeModal, setShowUnstakeModal] = useState(false)
   
   const { account, isConnected, getContract, provider } = useWeb3()
 
@@ -48,41 +54,51 @@ export function StakingDashboard() {
         setIsLoading(true)
         const tokenContract = getContract("TOKEN")
 
-        // Fetch current staked amount
-        const stakedAmount = await tokenContract.getStakedAmount(account)
+        // Fetch staking information
+        const [
+          stakedAmount,
+          stakingTimestamp,
+          unlockTime,
+          lockPeriod,
+          minimumStake,
+          autoMintAmount,
+          isEligibleForMinting,
+          userBalance
+        ] = await Promise.all([
+          tokenContract.getStakedAmount(account),
+          tokenContract.stakingTimestamp(account),
+          tokenContract.getUnlockTime(account),
+          tokenContract.STAKE_LOCK_PERIOD(),
+          tokenContract.BDAG_STAKE_AMOUNT(),
+          tokenContract.MINT_AMOUNT(),
+          tokenContract.isEligibleForMinting(account),
+          tokenContract.balanceOf(account) // This would be BDAG balance in real implementation
+        ])
+
         const stakedFormatted = ethers.formatEther(stakedAmount)
-
-        // Fetch staking timestamp
-        const stakingTimestamp = await tokenContract.stakingTimestamp(account)
         const stakingTime = Number(stakingTimestamp)
-
-        // Fetch unlock time
-        const unlockTime = await tokenContract.getUnlockTime(account)
         const unlockTimestamp = Number(unlockTime)
-
-        // Fetch contract constants
-        const lockPeriod = await tokenContract.STAKE_LOCK_PERIOD()
-        const minimumStake = await tokenContract.BDAG_STAKE_AMOUNT()
-        
-        // Get BDAG token balance (assuming user has BDAG tokens in their wallet)
-        // In a real implementation, you'd need the BDAG token contract
-        const bdagContract = getContract("TOKEN") // This would be the BDAG contract
-        const bdagBalance = await bdagContract.balanceOf(account)
-        const availableFormatted = ethers.formatEther(bdagBalance)
+        const lockPeriodDays = Number(lockPeriod) / (24 * 60 * 60) // Convert seconds to days
 
         // Format dates
         const stakeDate = stakingTime > 0 ? new Date(stakingTime * 1000).toLocaleDateString() : ""
         const unlockDate = unlockTimestamp > 0 ? new Date(unlockTimestamp * 1000).toLocaleDateString() : ""
+
+        // For demo purposes, simulate BDAG balance
+        // In production, this would query the actual BDAG token contract
+        const availableBalance = "500.00" // Mock available BDAG balance
 
         setStakingData({
           currentStake: parseFloat(stakedFormatted).toFixed(2),
           stakeDate,
           unlockDate,
           unlockTime: unlockTimestamp,
-          availableToStake: parseFloat(availableFormatted).toFixed(2),
-          stakeLockPeriod: Number(lockPeriod),
+          availableBalance,
+          stakeLockPeriod: lockPeriodDays,
           minimumStake: ethers.formatEther(minimumStake),
           isStakeActive: parseFloat(stakedFormatted) > 0,
+          autoMintAmount: ethers.formatEther(autoMintAmount),
+          isEligibleForMinting,
         })
       } catch (error) {
         console.error("Error fetching staking data:", error)
@@ -98,8 +114,9 @@ export function StakingDashboard() {
     if (!stakingData.isStakeActive || stakingData.unlockTime === 0) return 0
     
     const now = Math.floor(Date.now() / 1000)
-    const totalLockTime = stakingData.stakeLockPeriod
-    const elapsedTime = now - (stakingData.unlockTime - totalLockTime)
+    const totalLockTime = stakingData.stakeLockPeriod * 24 * 60 * 60 // Convert days to seconds
+    const stakeStartTime = stakingData.unlockTime - totalLockTime
+    const elapsedTime = now - stakeStartTime
     const progress = (elapsedTime / totalLockTime) * 100
     
     return Math.min(Math.max(progress, 0), 100)
@@ -114,66 +131,36 @@ export function StakingDashboard() {
   }
 
   const isUnlockTime = () => {
-    if (!stakingData.isStakeActive) return false
+    if (!stakingData.isStakeActive || stakingData.unlockTime === 0) return false
     return Date.now() / 1000 >= stakingData.unlockTime
   }
 
-  const handleStakeMore = async () => {
-    if (!isConnected || !account) return
-
-    setIsStaking(true)
-    try {
-      const tokenContract = getContract("TOKEN")
-      const tx = await tokenContract.stakeBDAG()
-      await tx.wait()
-      
-      // Refresh staking data
-      const stakedAmount = await tokenContract.getStakedAmount(account)
-      const stakedFormatted = ethers.formatEther(stakedAmount)
-      const unlockTime = await tokenContract.getUnlockTime(account)
-      
-      setStakingData(prev => ({
-        ...prev,
-        currentStake: parseFloat(stakedFormatted).toFixed(2),
-        unlockTime: Number(unlockTime),
-        isStakeActive: parseFloat(stakedFormatted) > 0,
-      }))
-      
-      alert("Successfully staked BDAG tokens!")
-    } catch (error) {
-      console.error("Error staking BDAG:", error)
-      alert("Failed to stake BDAG. Please ensure you have enough tokens and allowance.")
-    } finally {
-      setIsStaking(false)
-    }
+  const canStakeMore = () => {
+    return parseFloat(stakingData.availableBalance) >= parseFloat(stakingData.minimumStake)
   }
 
-  const handleUnstake = async () => {
-    if (!isConnected || !account || !isUnlockTime()) return
+  const handleStakeBDAG = async (): Promise<string> => {
+    const tokenContract = getContract("TOKEN")
+    const tx = await tokenContract.stakeBDAG()
+    
+    // Refresh data after transaction
+    setTimeout(() => {
+      window.location.reload()
+    }, 3000)
+    
+    return tx.hash
+  }
 
-    setIsUnstaking(true)
-    try {
-      const tokenContract = getContract("TOKEN")
-      const tx = await tokenContract.unstakeBDAG()
-      await tx.wait()
-      
-      // Refresh staking data
-      const stakedAmount = await tokenContract.getStakedAmount(account)
-      const stakedFormatted = ethers.formatEther(stakedAmount)
-      
-      setStakingData(prev => ({
-        ...prev,
-        currentStake: parseFloat(stakedFormatted).toFixed(2),
-        isStakeActive: parseFloat(stakedFormatted) > 0,
-      }))
-      
-      alert("Successfully unstaked BDAG tokens!")
-    } catch (error) {
-      console.error("Error unstaking BDAG:", error)
-      alert("Failed to unstake BDAG. Please try again.")
-    } finally {
-      setIsUnstaking(false)
-    }
+  const handleUnstakeBDAG = async (): Promise<string> => {
+    const tokenContract = getContract("TOKEN")
+    const tx = await tokenContract.unstakeBDAG()
+    
+    // Refresh data after transaction
+    setTimeout(() => {
+      window.location.reload()
+    }, 3000)
+    
+    return tx.hash
   }
 
   if (isLoading) {
@@ -190,103 +177,180 @@ export function StakingDashboard() {
   }
 
   return (
-    <Card className="mb-8">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Lock className="h-5 w-5 text-sky-blue" />
-          BDAG Staking
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-4">
-            <div>
-              <p className="text-sm text-muted-foreground">Current Stake</p>
-              <p className="text-2xl font-bold">{stakingData.currentStake} BDAG</p>
+    <>
+      <Card className="mb-8">
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Lock className="h-5 w-5 text-sky-blue" />
+              BDAG Staking Dashboard
             </div>
-
-            {stakingData.isStakeActive && (
-              <>
-                <div>
-                  <p className="text-sm text-muted-foreground">Stake Date</p>
-                  <p className="font-medium">{stakingData.stakeDate}</p>
-                </div>
-
-                <div>
-                  <p className="text-sm text-muted-foreground">Unlock Date</p>
-                  <p className="font-medium">
-                    {stakingData.unlockDate} ({getDaysLeft()} days left)
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-sm text-muted-foreground">Status</p>
-                  <div className="flex items-center gap-2">
-                    <Lock className="h-4 w-4 text-sky-blue" />
-                    <span className="font-medium text-sky-blue">
-                      {isUnlockTime() ? "Unlocked" : "Locked"}
-                    </span>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-
-          <div className="space-y-4">
-            {stakingData.isStakeActive && (
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-sm text-muted-foreground">Unlock Progress</p>
-                  <span className="text-sm font-medium">{Math.round(getUnlockProgress())}%</span>
-                </div>
-                <Progress value={getUnlockProgress()} className="h-3" />
-              </div>
-            )}
-
-            <div>
-              <p className="text-sm text-muted-foreground">Available to Stake</p>
-              <p className="text-xl font-bold">{stakingData.availableToStake} BDAG</p>
-            </div>
-
-            <div className="space-y-2">
-              <Button 
-                className="w-full bg-sky-blue hover:bg-sky-blue/90"
-                onClick={handleStakeMore}
-                disabled={isStaking || parseFloat(stakingData.availableToStake) < parseFloat(stakingData.minimumStake)}
-              >
-                {isStaking ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Plus className="h-4 w-4 mr-2" />
-                )}
-                Stake More BDAG
-              </Button>
-
+            <div className="flex items-center gap-2">
+              {stakingData.isEligibleForMinting && (
+                <Badge className="bg-climate-green/10 text-climate-green border-climate-green">
+                  Eligible for Rewards
+                </Badge>
+              )}
               {stakingData.isStakeActive && (
-                <Button 
-                  variant="outline"
-                  className="w-full"
-                  onClick={handleUnstake}
-                  disabled={isUnstaking || !isUnlockTime()}
-                >
-                  {isUnstaking ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : null}
-                  {isUnlockTime() ? "Unstake BDAG" : `Unlock in ${getDaysLeft()} days`}
-                </Button>
+                <Badge variant={isUnlockTime() ? "secondary" : "outline"}>
+                  {isUnlockTime() ? "Unlocked" : `Locked ${getDaysLeft()} days`}
+                </Badge>
               )}
             </div>
-          </div>
-        </div>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Current Stake</p>
+                <div className="flex items-baseline gap-2">
+                  <p className="text-3xl font-bold text-sky-blue">{stakingData.currentStake}</p>
+                  <p className="text-lg text-muted-foreground">BDAG</p>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Minimum: {stakingData.minimumStake} BDAG
+                </p>
+              </div>
 
-        <Alert>
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>
-            Warning: Unstaking will remove you from DAO membership and you'll lose voting rights.
-            Minimum stake required: {stakingData.minimumStake} BDAG.
-          </AlertDescription>
-        </Alert>
-      </CardContent>
-    </Card>
+              {stakingData.isStakeActive && (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Stake Date</p>
+                      <p className="font-medium">{stakingData.stakeDate}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Unlock Date</p>
+                      <p className="font-medium">{stakingData.unlockDate}</p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-2">Lock Period Progress</p>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span>{stakingData.stakeLockPeriod} day lock period</span>
+                        <span>{Math.round(getUnlockProgress())}% complete</span>
+                      </div>
+                      <Progress value={getUnlockProgress()} className="h-3" />
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Available BDAG Balance</p>
+                <div className="flex items-baseline gap-2">
+                  <p className="text-2xl font-bold">{stakingData.availableBalance}</p>
+                  <p className="text-lg text-muted-foreground">BDAG</p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <Button 
+                  className="w-full bg-sky-blue hover:bg-sky-blue/90"
+                  onClick={() => setShowStakeModal(true)}
+                  disabled={!canStakeMore()}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Stake {stakingData.minimumStake} BDAG
+                </Button>
+
+                {stakingData.isStakeActive && (
+                  <Button 
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => setShowUnstakeModal(true)}
+                    disabled={!isUnlockTime()}
+                  >
+                    <Coins className="h-4 w-4 mr-2" />
+                    {isUnlockTime() ? "Unstake All BDAG" : `Unlock in ${getDaysLeft()} days`}
+                  </Button>
+                )}
+
+                {!canStakeMore() && (
+                  <p className="text-sm text-muted-foreground text-center">
+                    Need {stakingData.minimumStake} BDAG to stake
+                  </p>
+                )}
+              </div>
+
+              {/* Rewards Info */}
+              <div className="bg-climate-green/5 border border-climate-green/20 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Coins className="h-4 w-4 text-climate-green" />
+                  <p className="font-medium text-climate-green">Staking Rewards</p>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Earn {stakingData.autoMintAmount} CLT tokens immediately when you stake {stakingData.minimumStake} BDAG. 
+                  Plus ongoing rewards from platform activities!
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Important Warnings */}
+          <div className="space-y-4">
+            <Alert>
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                <strong>Important:</strong> Unstaking will remove you from DAO membership and you'll lose all platform privileges including voting rights and validator status.
+              </AlertDescription>
+            </Alert>
+
+            <Alert>
+              <Clock className="h-4 w-4" />
+              <AlertDescription>
+                <strong>Lock Period:</strong> BDAG tokens are locked for {stakingData.stakeLockPeriod} days after staking. 
+                This ensures platform stability and commitment to the ecosystem.
+              </AlertDescription>
+            </Alert>
+          </div>
+
+          {/* Staking Benefits */}
+          <div className="bg-muted/50 p-4 rounded-lg">
+            <h4 className="font-medium mb-3">Staking Benefits</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-climate-green rounded-full"></div>
+                <span>Immediate {stakingData.autoMintAmount} CLT token reward</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-climate-green rounded-full"></div>
+                <span>Access to report submission (20 CLT per report)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                <span>Eligibility for DAO membership and validation</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                <span>Governance participation and voting rights</span>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Transaction Modals */}
+      <TransactionModal
+        isOpen={showStakeModal}
+        onClose={() => setShowStakeModal(false)}
+        title="Stake BDAG Tokens"
+        description={`Stake ${stakingData.minimumStake} BDAG tokens to join ClimaLink and earn ${stakingData.autoMintAmount} CLT tokens immediately. Tokens will be locked for ${stakingData.stakeLockPeriod} days.`}
+        onConfirm={handleStakeBDAG}
+      />
+
+      <TransactionModal
+        isOpen={showUnstakeModal}
+        onClose={() => setShowUnstakeModal(false)}
+        title="Unstake BDAG Tokens"
+        description="Unstake all your BDAG tokens. Warning: This will remove your DAO membership, validator status, and all platform privileges."
+        onConfirm={handleUnstakeBDAG}
+      />
+    </>
   )
 }
