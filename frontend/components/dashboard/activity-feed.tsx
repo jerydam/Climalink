@@ -6,11 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { CheckCircleIcon, DocumentTextIcon, UserGroupIcon, CurrencyDollarIcon } from "@heroicons/react/24/outline"
 import { useWeb3 } from "@/lib/web3"
-import { Loader2 } from "lucide-react"
+import { Loader2, Lock, Users } from "lucide-react"
 
 interface Activity {
   id: string
-  type: "validation" | "report" | "vote" | "reward" | "stake"
+  type: "validation" | "report" | "vote" | "reward" | "stake" | "dao_join"
   message: string
   reward: string | null
   time: string
@@ -39,34 +39,59 @@ export function ActivityFeed() {
 
         const activities: Activity[] = []
 
-        // Get current block number and look back ~1000 blocks (roughly last few hours)
+        // Get current block number and look back for recent activities
         const currentBlock = await provider.getBlockNumber()
-        const fromBlock = Math.max(0, currentBlock - 1000)
+        const fromBlock = Math.max(0, currentBlock - 2000) // Look back ~2000 blocks for recent activity
 
         try {
-          // Fetch token minting events (rewards)
-          const mintEvents = await tokenContract.queryFilter(
-            tokenContract.filters.Mint(account),
+          // Fetch staking events (show as initial platform join)
+          const stakeEvents = await tokenContract.queryFilter(
+            tokenContract.filters.Stake(account),
             fromBlock,
             currentBlock
           )
 
-          for (const event of mintEvents.slice(-5)) { // Get last 5 events
+          for (const event of stakeEvents.slice(-3)) {
             const block = await event.getBlock()
             const amount = event.args?.[1] || 0
             activities.push({
-              id: `mint-${event.transactionHash}`,
-              type: "reward",
-              message: "Earned CLT tokens from platform activities",
-              reward: `+${(Number(amount) / 1e18).toFixed(0)} CLT`,
+              id: `stake-${event.transactionHash}`,
+              type: "stake",
+              message: "Staked BDAG tokens and joined ClimaLink",
+              reward: "+1000 CLT",
               time: formatTimeAgo(Number(block.timestamp) * 1000),
-              icon: CurrencyDollarIcon,
-              color: "text-success",
+              icon: Lock,
+              color: "text-sky-blue",
               txHash: event.transactionHash,
             })
           }
         } catch (error) {
-          console.error("Error fetching mint events:", error)
+          console.error("Error fetching stake events:", error)
+        }
+
+        try {
+          // Fetch DAO membership events
+          const daoJoinEvents = await daoContract.queryFilter(
+            daoContract.filters.MemberJoined(account),
+            fromBlock,
+            currentBlock
+          )
+
+          for (const event of daoJoinEvents.slice(-2)) {
+            const block = await event.getBlock()
+            activities.push({
+              id: `dao-join-${event.transactionHash}`,
+              type: "dao_join",
+              message: "Joined ClimaLink DAO as Validator",
+              reward: "Role Upgrade",
+              time: formatTimeAgo(Number(block.timestamp) * 1000),
+              icon: Users,
+              color: "text-purple-500",
+              txHash: event.transactionHash,
+            })
+          }
+        } catch (error) {
+          console.error("Error fetching DAO events:", error)
         }
 
         try {
@@ -77,43 +102,55 @@ export function ActivityFeed() {
             currentBlock
           )
 
-          for (const event of reportEvents.slice(-3)) { // Get last 3 events
+          for (const event of reportEvents.slice(-5)) {
             const block = await event.getBlock()
             const reportId = event.args?.[0] || 0
-            activities.push({
-              id: `report-${event.transactionHash}`,
-              type: "report",
-              message: `Climate report #${reportId} submitted`,
-              reward: "+20 CLT",
-              time: formatTimeAgo(Number(block.timestamp) * 1000),
-              icon: DocumentTextIcon,
-              color: "text-primary",
-              txHash: event.transactionHash,
-            })
+            
+            // Check if this report belongs to current user
+            try {
+              const report = await climateContract.getClimateReport(reportId)
+              if (report.reporter.toLowerCase() === account.toLowerCase()) {
+                const status = report.status === 1 ? "validated" : report.status === 2 ? "rejected" : "pending"
+                activities.push({
+                  id: `report-${event.transactionHash}`,
+                  type: "report",
+                  message: `Weather report #${reportId} ${status}`,
+                  reward: status === "validated" ? "+20 CLT" : null,
+                  time: formatTimeAgo(Number(block.timestamp) * 1000),
+                  icon: DocumentTextIcon,
+                  color: status === "validated" ? "text-climate-green" : "text-amber-500",
+                  txHash: event.transactionHash,
+                })
+              }
+            } catch (reportError) {
+              // Skip if can't get report details
+              continue
+            }
           }
         } catch (error) {
           console.error("Error fetching report events:", error)
         }
 
         try {
-          // Fetch validation events
+          // Fetch validation events (votes cast by user)
           const validationEvents = await climateContract.queryFilter(
-            climateContract.filters.ReportValidated(),
+            climateContract.filters.ReportVoteCast(null, account),
             fromBlock,
             currentBlock
           )
 
-          for (const event of validationEvents.slice(-3)) { // Get last 3 events
+          for (const event of validationEvents.slice(-5)) {
             const block = await event.getBlock()
             const reportId = event.args?.[0] || 0
+            const voteChoice = event.args?.[2] || 0 // 0 = Invalid, 1 = Valid
             activities.push({
               id: `validation-${event.transactionHash}`,
               type: "validation",
-              message: `Report #${reportId} was validated`,
-              reward: "+10 CLT",
+              message: `Voted "${voteChoice === 1 ? 'Valid' : 'Invalid'}" on report #${reportId}`,
+              reward: "+5 CLT", // Validator participation reward
               time: formatTimeAgo(Number(block.timestamp) * 1000),
               icon: CheckCircleIcon,
-              color: "text-success",
+              color: "text-blue-500",
               txHash: event.transactionHash,
             })
           }
@@ -129,17 +166,19 @@ export function ActivityFeed() {
             currentBlock
           )
 
-          for (const event of voteEvents.slice(-3)) { // Get last 3 events
+          for (const event of voteEvents.slice(-3)) {
             const block = await event.getBlock()
             const proposalId = event.args?.[0] || 0
+            const voteType = event.args?.[2] || 0 // 0 = Against, 1 = For, 2 = Abstain
+            const voteTypeText = voteType === 1 ? "For" : voteType === 0 ? "Against" : "Abstain"
             activities.push({
               id: `vote-${event.transactionHash}`,
               type: "vote",
-              message: `Voted on Proposal #${proposalId}`,
-              reward: null,
+              message: `Voted "${voteTypeText}" on Proposal #${proposalId}`,
+              reward: "Governance Participation",
               time: formatTimeAgo(Number(block.timestamp) * 1000),
               icon: UserGroupIcon,
-              color: "text-secondary",
+              color: "text-purple-500",
               txHash: event.transactionHash,
             })
           }
@@ -147,10 +186,50 @@ export function ActivityFeed() {
           console.error("Error fetching vote events:", error)
         }
 
-        // Sort activities by time (most recent first)
-        activities.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())
+        try {
+          // Fetch CLT mint/reward events
+          const mintEvents = await tokenContract.queryFilter(
+            tokenContract.filters.Mint(account),
+            fromBlock,
+            currentBlock
+          )
 
-        setActivities(activities.slice(0, 6)) // Show only latest 6 activities
+          for (const event of mintEvents.slice(-5)) {
+            const block = await event.getBlock()
+            const amount = event.args?.[1] || 0
+            const amountFormatted = (Number(amount) / 1e18).toFixed(0)
+            
+            // Determine reward type based on amount
+            let rewardType = "Platform reward"
+            if (amountFormatted === "1000") {
+              rewardType = "Initial staking bonus"
+            } else if (amountFormatted === "20") {
+              rewardType = "Validated report reward"
+            }
+            
+            activities.push({
+              id: `mint-${event.transactionHash}`,
+              type: "reward",
+              message: rewardType,
+              reward: `+${amountFormatted} CLT`,
+              time: formatTimeAgo(Number(block.timestamp) * 1000),
+              icon: CurrencyDollarIcon,
+              color: "text-climate-green",
+              txHash: event.transactionHash,
+            })
+          }
+        } catch (error) {
+          console.error("Error fetching mint events:", error)
+        }
+
+        // Sort activities by time (most recent first)
+        activities.sort((a, b) => {
+          const timeA = new Date(a.time.includes("ago") ? Date.now() : a.time).getTime()
+          const timeB = new Date(b.time.includes("ago") ? Date.now() : b.time).getTime()
+          return timeB - timeA
+        })
+
+        setActivities(activities.slice(0, 8)) // Show latest 8 activities
       } catch (error) {
         console.error("Error fetching activities:", error)
       } finally {
@@ -159,6 +238,10 @@ export function ActivityFeed() {
     }
 
     fetchRecentActivities()
+    
+    // Auto-refresh every 30 seconds
+    const interval = setInterval(fetchRecentActivities, 30000)
+    return () => clearInterval(interval)
   }, [account, isConnected, getContract, provider])
 
   const formatTimeAgo = (timestamp: number) => {
@@ -177,7 +260,12 @@ export function ActivityFeed() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Recent Activity</CardTitle>
+        <CardTitle className="flex items-center justify-between">
+          Recent Activity
+          <Badge variant="secondary" className="bg-climate-green/10 text-climate-green">
+            Live
+          </Badge>
+        </CardTitle>
       </CardHeader>
       <CardContent>
         {isLoading ? (
@@ -190,7 +278,9 @@ export function ActivityFeed() {
         ) : activities.length === 0 ? (
           <div className="text-center py-8">
             <p className="text-muted-foreground">No recent activities found</p>
-            <p className="text-sm text-muted-foreground mt-1">Start by submitting a climate report!</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Start by submitting a weather report to earn 20 CLT tokens!
+            </p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -203,7 +293,15 @@ export function ActivityFeed() {
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-medium">{activity.message}</p>
                     {activity.reward && (
-                      <Badge variant="secondary" className="ml-2">
+                      <Badge 
+                        variant="secondary" 
+                        className={cn(
+                          "ml-2",
+                          activity.reward.includes("CLT") && "bg-climate-green/10 text-climate-green",
+                          activity.reward === "Role Upgrade" && "bg-purple-100 text-purple-800",
+                          activity.reward === "Governance Participation" && "bg-blue-100 text-blue-800"
+                        )}
+                      >
                         {activity.reward}
                       </Badge>
                     )}
@@ -222,6 +320,32 @@ export function ActivityFeed() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Activity Summary */}
+        {!isLoading && activities.length > 0 && (
+          <div className="mt-6 pt-4 border-t">
+            <div className="grid grid-cols-3 gap-4 text-center">
+              <div>
+                <p className="text-sm font-bold text-climate-green">
+                  {activities.filter(a => a.type === "report").length}
+                </p>
+                <p className="text-xs text-muted-foreground">Reports</p>
+              </div>
+              <div>
+                <p className="text-sm font-bold text-blue-500">
+                  {activities.filter(a => a.type === "validation").length}
+                </p>
+                <p className="text-xs text-muted-foreground">Validations</p>
+              </div>
+              <div>
+                <p className="text-sm font-bold text-purple-500">
+                  {activities.filter(a => a.type === "vote").length}
+                </p>
+                <p className="text-xs text-muted-foreground">DAO Votes</p>
+              </div>
+            </div>
           </div>
         )}
       </CardContent>

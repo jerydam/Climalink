@@ -12,63 +12,238 @@ import { useRole } from "@/lib/roles"
 import { useWeb3 } from "@/lib/web3"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Loader2, UserPlus, ShieldCheck, Users } from "lucide-react"
+import { TransactionModal } from "@/components/blockchain/transaction-modal"
+import { Loader2, UserPlus, ShieldCheck, Users, FileText, Coins } from "lucide-react"
+import { useState } from "react"
 
-function AccessDenied() {
-  const { joinAsReporter, joinAsValidator, joinDAO, stakeBDAG } = useRole()
-  const router = useRouter()
+function WelcomeNewUser() {
+  const { getContract } = useWeb3()
+  const [activeModal, setActiveModal] = useState<string | null>(null)
+
+  const handleJoinAsReporter = async (): Promise<string> => {
+    const climateContract = getContract("CLIMATE")
+    const tx = await climateContract.joinAsReporterOrValidator()
+    return tx.hash
+  }
+
+  const handleStakeAndJoinValidator = async (): Promise<string> => {
+    const tokenContract = getContract("TOKEN")
+    const tx = await tokenContract.stakeBDAG()
+    
+    // After staking, automatically join as validator
+    setTimeout(async () => {
+      try {
+        const climateContract = getContract("CLIMATE")
+        await climateContract.joinAsReporterOrValidator()
+      } catch (error) {
+        console.error("Auto-join failed:", error)
+      }
+    }, 3000)
+    
+    return tx.hash
+  }
 
   return (
-    <div className="min-h-screen bg-background">
-      <MainNav />
-      <main className="container mx-auto px-4 py-8">
-        <div className="max-w-2xl mx-auto">
-          <Card>
-            <CardContent className="p-8 text-center">
-              <div className="w-16 h-16 bg-climate-gradient rounded-full flex items-center justify-center mx-auto mb-4">
-                <ShieldCheck className="h-8 w-8 text-white" />
-              </div>
-              <h1 className="text-2xl font-bold mb-4">Access Restricted</h1>
-              <p className="text-muted-foreground mb-6">
-                This dashboard is only accessible to registered members. Please join as a reporter, validator, or DAO member to continue.
+    <>
+      <div className="min-h-screen bg-background">
+        <MainNav />
+        <main className="container mx-auto px-4 py-8">
+          <div className="max-w-4xl mx-auto">
+            <div className="text-center mb-8">
+              <h1 className="text-3xl font-bold mb-4">Welcome to ClimaLink</h1>
+              <p className="text-lg text-muted-foreground mb-2">
+                Join the global climate reporting community and start earning rewards
               </p>
-              
-              <div className="grid gap-4">
-                <Button 
-                  onClick={joinAsReporter} 
-                  className="bg-climate-green hover:bg-climate-green/90"
-                >
-                  <UserPlus className="h-4 w-4 mr-2" />
-                  Join as Reporter
-                </Button>
-                
-                <Button 
-                  onClick={joinAsValidator}
-                  variant="outline"
-                >
-                  <ShieldCheck className="h-4 w-4 mr-2" />
-                  Join as Validator
-                </Button>
-                
-                <Button 
-                  onClick={() => {
-                    stakeBDAG().then(() => joinDAO())
-                  }}
-                  variant="outline"
-                >
-                  <Users className="h-4 w-4 mr-2" />
-                  Stake BDAG & Join DAO
-                </Button>
-              </div>
-              
-              <p className="text-sm text-muted-foreground mt-4">
-                Note: DAO membership requires staking BDAG tokens first.
+              <p className="text-muted-foreground">
+                Choose your role - both can earn CLT tokens in different ways
               </p>
-            </CardContent>
-          </Card>
-        </div>
-      </main>
-    </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+              {/* Reporter Option */}
+              <Card className="border-green-300 bg-gradient-to-r from-climate-green/10 to-emerald-50">
+                <CardContent className="p-6">
+                  <div className="text-center">
+                    <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <FileText className="h-8 w-8 text-white" />
+                    </div>
+                    <h2 className="text-xl font-bold mb-2">Reporter</h2>
+                    <p className="text-lg font-bold text-green-600 mb-4">FREE TO JOIN</p>
+                    
+                    <div className="space-y-3 mb-6 text-left">
+                      <div className="flex items-center gap-3">
+                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                        <span className="text-sm">Submit weather reports from anywhere</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                        <span className="text-sm font-medium">Earn 20 CLT per validated report</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                        <span className="text-sm">Contribute to global climate data</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                        <span className="text-sm">View community climate map</span>
+                      </div>
+                    </div>
+
+                    <Button 
+                      onClick={() => setActiveModal("join-reporter")}
+                      className="w-full bg-green-600 hover:bg-green-700"
+                    >
+                      <UserPlus className="h-4 w-4 mr-2" />
+                      Join as Reporter (Free)
+                    </Button>
+                    
+                    <p className="text-xs text-gray-500 mt-3">
+                      No staking required • Earn from your reports
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Validator Option */}
+              <Card className="border-purple-300 bg-purple-50">
+                <CardContent className="p-6">
+                  <div className="text-center">
+                    <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <ShieldCheck className="h-8 w-8 text-white" />
+                    </div>
+                    <h2 className="text-xl font-bold mb-2">Validator</h2>
+                    <p className="text-lg font-bold text-purple-600 mb-4">REQUIRES STAKING</p>
+                    
+                    <div className="space-y-3 mb-6 text-left">
+                      <div className="flex items-center gap-3">
+                        <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                        <span className="text-sm">Validate community reports</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                        <span className="text-sm font-medium">Share rewards for correct validation</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
+                        <span className="text-sm font-medium">Get 1000 CLT staking bonus</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                        <span className="text-sm">DAO governance participation</span>
+                      </div>
+                    </div>
+
+                    <Button 
+                      onClick={() => setActiveModal("stake-join-validator")}
+                      className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                    >
+                      <Coins className="h-4 w-4 mr-2" />
+                      Stake & Join as Validator
+                    </Button>
+                    
+                    <p className="text-xs text-muted-foreground mt-3">
+                      Requires: 100 BDAG tokens • 60-day lock
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Reward Structure Explanation */}
+            <Card className="mb-6">
+              <CardContent className="p-6">
+                <h3 className="font-semibold mb-4 text-center">How Rewards Work</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="text-center">
+                    <div className="w-12 h-12 bg-climate-green rounded-full flex items-center justify-center mx-auto mb-3">
+                      <FileText className="h-6 w-6 text-white" />
+                    </div>
+                    <h4 className="font-medium text-climate-green mb-2">Reporter Earnings</h4>
+                    <ul className="text-sm space-y-1 text-left">
+                      <li>• Submit weather reports</li>
+                      <li>• <strong>Earn 20 CLT when validated</strong></li>
+                      <li>• No staking required</li>
+                      <li>• Get paid for contributing data</li>
+                    </ul>
+                  </div>
+                  
+                  <div className="text-center">
+                    <div className="w-12 h-12 bg-purple-600 rounded-full flex items-center justify-center mx-auto mb-3">
+                      <ShieldCheck className="h-6 w-6 text-white" />
+                    </div>
+                    <h4 className="font-medium text-purple-600 mb-2">Validator Earnings</h4>
+                    <ul className="text-sm space-y-1 text-left">
+                      <li>• Validate community reports</li>
+                      <li>• <strong>Winning validators share reward pool</strong></li>
+                      <li>• 1000 CLT staking bonus</li>
+                      <li>• Earn for accurate voting</li>
+                    </ul>
+                  </div>
+                </div>
+                
+                <div className="mt-6 p-4 bg-muted/50 rounded-lg">
+                  <p className="text-sm text-center text-muted-foreground">
+                    <strong>Both roles earn CLT tokens:</strong> Reporters earn from their validated reports, 
+                    Validators earn from correctly validating reports and share reward pools.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Join as Reporter CTA */}
+            <Card className="border-climate-green bg-gradient-to-r from-climate-green/10 to-emerald-50 mb-6">
+              <CardContent className="p-6">
+                <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+                  <div className="text-center md:text-left">
+                    <h3 className="text-xl font-semibold text-climate-green mb-2">Ready to Start Earning?</h3>
+                    <p className="text-muted-foreground mb-1">
+                      Join as a Reporter completely free and earn 20 CLT tokens for each validated weather report.
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      No staking required • Instant access • Immediate earning potential
+                    </p>
+                  </div>
+                  <div className="flex gap-3">
+                    <Button 
+                      onClick={() => setActiveModal("join-reporter")}
+                      className="bg-climate-green hover:bg-climate-green/90 text-white px-8 py-3 text-lg"
+                    >
+                      <UserPlus className="h-5 w-5 mr-2" />
+                      Join as Reporter (Free)
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Start Free Message */}
+            <div className="text-center">
+              <p className="text-sm text-muted-foreground">
+                Start as a Reporter for free and earn CLT tokens immediately. 
+                Upgrade to Validator anytime to participate in validation and governance.
+              </p>
+            </div>
+          </div>
+        </main>
+      </div>
+
+      {/* Transaction Modals */}
+      <TransactionModal
+        isOpen={activeModal === "join-reporter"}
+        onClose={() => setActiveModal(null)}
+        title="Join as Reporter"
+        description="Join ClimaLink as a Reporter completely free! Submit weather reports from any location and earn 20 CLT tokens when your reports are validated by the community. No staking required."
+        onConfirm={handleJoinAsReporter}
+      />
+
+      <TransactionModal
+        isOpen={activeModal === "stake-join-validator"}
+        onClose={() => setActiveModal(null)}
+        title="Stake BDAG & Join as Validator"
+        description="Stake 100 BDAG tokens to become a Validator. You'll receive 1000 CLT tokens immediately as a bonus, then earn rewards by correctly validating community reports. Validators who vote correctly share additional reward pools. Tokens are locked for 60 days."
+        onConfirm={handleStakeAndJoinValidator}
+      />
+    </>
   )
 }
 
@@ -104,7 +279,20 @@ export default function DashboardPage() {
   }
 
   if (!isMember) {
-    return <AccessDenied />
+    return <WelcomeNewUser />
+  }
+
+  const getRoleDisplayName = () => {
+    switch (userRole) {
+      case "dao_member":
+        return "DAO Member & Validator"
+      case "validator":
+        return "Validator"
+      case "reporter":
+        return "Reporter"
+      default:
+        return "Member"
+    }
   }
 
   return (
@@ -116,13 +304,95 @@ export default function DashboardPage() {
           {/* Welcome Section */}
           <div>
             <h1 className="text-3xl font-bold mb-2">
-              Welcome back{userRole === "dao_member" ? ", DAO Member" : userRole === "reporter" ? ", Reporter" : userRole === "validator" ? ", Validator" : ""}!
+              Welcome back, {getRoleDisplayName()}!
             </h1>
-            <p className="text-muted-foreground">Here's what's happening with your climate reporting activity.</p>
+            <p className="text-muted-foreground">
+              Here's your ClimaLink activity overview. 
+              {userRole === "reporter" && " You're earning 20 CLT per validated report!"}
+              {userRole === "validator" && " You're earning from validation accuracy and sharing reward pools!"}
+            </p>
           </div>
 
           {/* Stats Cards */}
           <StatsCards />
+
+          {/* Role-specific Information Cards */}
+          {userRole === "reporter" && (
+            <Card className="border-blue-200 bg-blue-50">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-semibold text-blue-800 mb-1">Want to Earn More?</h3>
+                    <p className="text-sm text-blue-700 mb-2">
+                      Become a Validator to earn from validating reports plus get 1000 CLT staking bonus!
+                    </p>
+                    <p className="text-xs text-blue-600">
+                      Winning validators share reward pools for correct votes
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button 
+                      className="bg-blue-600 hover:bg-blue-700"
+                      onClick={() => router.push("/portfolio")}
+                    >
+                      <Coins className="h-4 w-4 mr-2" />
+                      Become Validator
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {userRole === "validator" && (
+            <Card className="border-amber-200 bg-amber-50">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-semibold text-amber-800 mb-1">Join the DAO</h3>
+                    <p className="text-sm text-amber-700 mb-2">
+                      Unlock governance participation and create proposals! Requires 1000 CLT membership fee.
+                    </p>
+                  </div>
+                  <Button 
+                    className="bg-amber-600 hover:bg-amber-700"
+                    onClick={() => router.push("/dao")}
+                  >
+                    <Users className="h-4 w-4 mr-2" />
+                    Join DAO
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Join as Reporter CTA for non-members */}
+          {!isMember && (
+            <Card className="border-climate-green bg-gradient-to-r from-climate-green/10 to-emerald-50">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-xl font-semibold text-climate-green mb-2">Start Earning Today!</h3>
+                    <p className="text-muted-foreground mb-1">
+                      Join as a Reporter completely free and earn 20 CLT tokens for each validated weather report.
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      No staking required • Instant access • Immediate earning potential
+                    </p>
+                  </div>
+                  <div className="flex gap-3">
+                    <Button 
+                      onClick={() => setActiveModal("join-reporter")}
+                      className="bg-climate-green hover:bg-climate-green/90 text-white px-8 py-3 text-lg"
+                    >
+                      <UserPlus className="h-5 w-5 mr-2" />
+                      Join as Reporter (Free)
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Main Content Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
