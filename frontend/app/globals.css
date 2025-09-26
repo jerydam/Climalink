@@ -1,4 +1,7 @@
 @import "tailwindcss";
+@custom-variant hover (&:hover);
+@import 'leaflet/dist/leaflet.css';
+
 @import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));

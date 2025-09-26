@@ -82,7 +82,7 @@ export default function LandingPage() {
             <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
               <Button
                 size="lg"
-                className="bg-white text-primary hover:bg-white/90 text-lg px-8 py-4 h-14 rounded-xl font-semibold shadow-modern-lg"
+                className="bg-white text-primary hover:text-white/90 hover:border hover:border-white/80 text-lg px-8 py-4 h-14 rounded-xl font-semibold shadow-modern-lg hover:px-11 hover:bg-primary/20"
                 onClick={handleGetStarted}
               >
                 <ArrowRightIcon className="w-5 h-5 mr-2" />
@@ -91,7 +91,7 @@ export default function LandingPage() {
               <Button
                 size="lg"
                 variant="outline"
-                className="border-2 border-white/30 text-white hover:bg-white/10 text-lg px-8 py-4 h-14 rounded-xl font-semibold bg-white/5 backdrop-blur-sm"
+                className="border-2 border-white/30 text-white hover:bg-white hover:border hover:border-primary hover:px-11 hover:text-primary text-lg px-8 py-4 h-14 rounded-xl font-semibold bg-white/5 backdrop-blur-sm"
                 onClick={handleWatchDemo}
               >
                 <PlayIcon className="w-5 h-5 mr-2" />
@@ -164,7 +164,7 @@ export default function LandingPage() {
             ].map((feature, index) => (
               <Card
                 key={index}
-                className="group hover:shadow-modern-lg transition-all duration-300 border-0 shadow-modern rounded-2xl overflow-hidden"
+                className="group hover:shadow-modern-lg hover:border hover:border-primary/80 transition-all duration-300 border-0 shadow-modern rounded-2xl overflow-hidden"
               >
                 <CardContent className="p-8">
                   <div
@@ -254,7 +254,7 @@ export default function LandingPage() {
             <div className="flex flex-col sm:flex-row gap-6 justify-center mb-16">
               <Button
                 size="lg"
-                className="bg-white text-primary hover:bg-white/90 text-lg px-10 py-4 h-16 rounded-xl font-semibold shadow-modern-lg"
+                className="bg-white text-primary hover:text-white hover:border hover:border-white text-lg px-10 py-4 h-16 rounded-xl font-semibold shadow-modern-lg hover:px-11 hover:bg-primary/20"
                 onClick={handleConnectWallet}
               >
                 <GlobeAltIcon className="w-6 h-6 mr-3" />
@@ -263,7 +263,7 @@ export default function LandingPage() {
               <Button
                 size="lg"
                 variant="outline"
-                className="border-2 border-white/30 text-white hover:bg-white/10 text-lg px-10 py-4 h-16 rounded-xl font-semibold bg-white/5 backdrop-blur-sm"
+                className="border-2 border-white/30 text-white hover:bg-white text-lg px-10 py-4 hover:px-11 h-16 rounded-xl font-semibold bg-white/5 backdrop-blur-sm hover:text-primary"
                 onClick={handleExploreRewards}
               >
                 <CurrencyDollarIcon className="w-6 h-6 mr-3" />
