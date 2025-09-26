@@ -9,6 +9,14 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-}
+  webpack(config) {
+    config.module.rules.push({
+      test: /\.(png|jpe?g|gif|svg)$/i,
+      type: 'asset/resource',
+    });
 
-export default nextConfig
+    return config;
+  },
+};
+
+export default nextConfig;

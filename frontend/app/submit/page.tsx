@@ -165,9 +165,9 @@ export default function SubmitReportPage() {
     return <LoadingPage />
   }
 
-  if (!isMember || (userRole !== "reporter" && userRole !== "validator" && userRole !== "dao_member")) {
-    return <AccessDenied />
-  }
+  // if (!isMember || (userRole !== "reporter" && userRole !== "validator" && userRole !== "dao_member")) {
+  //   return <AccessDenied />
+  // }
 
   return (
     <div className="min-h-screen bg-background">

@@ -155,15 +155,15 @@ function WelcomeNewUser() {
                 <h3 className="font-semibold mb-4 text-center">How Rewards Work</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="text-center">
-                    <div className="w-12 h-12 bg-climate-green rounded-full flex items-center justify-center mx-auto mb-3">
+                    <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
                       <FileText className="h-6 w-6 text-white" />
                     </div>
-                    <h4 className="font-medium text-climate-green mb-2">Reporter Earnings</h4>
-                    <ul className="text-sm space-y-1 text-left">
-                      <li>• Submit weather reports</li>
-                      <li>• <strong>Earn 20 CLT when validated</strong></li>
-                      <li>• No staking required</li>
-                      <li>• Get paid for contributing data</li>
+                    <h4 className="font-medium text-green-600 mb-2">Reporter Earnings</h4>
+                    <ul className="text-sm space-y-1 text-center">
+                      <li> Submit weather reports</li>
+                      <li> <strong>Earn 20 CLT when validated</strong></li>
+                      <li> No staking required</li>
+                      <li> Get paid for contributing data</li>
                     </ul>
                   </div>
                   
@@ -172,11 +172,11 @@ function WelcomeNewUser() {
                       <ShieldCheck className="h-6 w-6 text-white" />
                     </div>
                     <h4 className="font-medium text-purple-600 mb-2">Validator Earnings</h4>
-                    <ul className="text-sm space-y-1 text-left">
-                      <li>• Validate community reports</li>
-                      <li>• <strong>Winning validators share reward pool</strong></li>
-                      <li>• 1000 CLT staking bonus</li>
-                      <li>• Earn for accurate voting</li>
+                    <ul className="text-sm space-y-1 text-center">
+                      <li> Validate community reports</li>
+                      <li><strong>Winning validators share reward pool</strong></li>
+                      <li> 1000 CLT staking bonus</li>
+                      <li> Earn for accurate voting</li>
                     </ul>
                   </div>
                 </div>

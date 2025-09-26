@@ -47,7 +47,7 @@ export function TransactionModal({
       const gasPrice = feeData.gasPrice || ethers.parseUnits("20", "gwei")
       
       // Estimate gas for a typical transaction (simplified)
-      const estimatedGas = 150000n // Typical gas limit for contract interaction
+      const estimatedGas = BigInt(150000) // Typical gas limit for contract interaction
       const totalCost = gasPrice * estimatedGas
       
       setGasEstimate(`${ethers.formatEther(totalCost)} ETH`)
