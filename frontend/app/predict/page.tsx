@@ -2,6 +2,7 @@
 "use client";
 import { useState } from "react";
 import DramaticMap from "@/components/mapnav";
+import { MainNav } from "@/components/navigation/main-nav";
 
 export default function Page() {
   const [locationDetails, setLocationDetails] = useState<any>(null);
@@ -52,7 +53,9 @@ export default function Page() {
   };
 
   return (
-    <div className="flex h-screen">
+    <>
+    <MainNav />
+    <div className="flex max-md:flex-col h-screen">
       {/* Map Side */}
       <div className="w-1/2 h-full">
         <DramaticMap onLocationFound={handleLocationFound} />
@@ -154,5 +157,6 @@ export default function Page() {
         )}
       </div>
     </div>
+    </>
   );
 }
