@@ -8,8 +8,8 @@ export async function GET(req: Request) {
 
   try {
     const [currentRes, forecastRes] = await Promise.all([
-      fetch(`http://six-towns-change.loca.lt/api/current?latitude=${lat}&longitude=${lon}`),
-      fetch(`http://six-towns-change.loca.lt/api/forecast?latitude=${lat}&longitude=${lon}`)
+      fetch(`https://climalink-l1md.vercel.app/api/current?latitude=${lat}&longitude=${lon}`),
+      fetch(`https://climalink-l1md.vercel.app/api/forecast?latitude=${lat}&longitude=${lon}`)
     ]);
 
     if (!currentRes.ok || !forecastRes.ok) {
