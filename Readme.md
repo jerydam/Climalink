@@ -300,46 +300,30 @@ backend/
 
 ## Project Structure
 ```
-Climalink/
-├── Readme.md
-├── backend/
-│   ├── .env
-│   ├── server.js
-│   ├── controllers/
-│   │   └── weatherController.js
-│   ├── routes/
-│   │   └── api.js
-│   └── services/
-│       └── weatherService.js
-├── frontend/
-│   ├── app/
-│   │   ├── api/weather/         # Weather API endpoints
-│   │   ├── blockchain/          # Blockchain interaction pages
-│   │   ├── create/              # Report creation UI
-│   │   ├── dao/                # DAO governance UI
-│   │   ├── dashboard/          # User dashboard
-│   │   ├── portfolio/          # User contributions
-│   │   ├── predict/            # Weather forecast display
-│   │   ├── profile/            # User profile management
-│   │   ├── submit/             # Report submission UI
-│   │   └── validate/           # Report validation UI
-│   ├── components/             # Reusable UI components
-│   ├── hooks/                  # Custom React hooks
-│   ├── lib/                    # Utility functions
-│   ├── public/                 # Static assets
-│   ├── styles/                 # Global CSS
-│   └── utils/                  # Helper scripts
-├── smart contract/
-│   ├── src/
-│   │   ├── BdagToken.sol       # BDAG token contract
-│   │   ├── climate.sol         # Climate report contract
-│   │   ├── dao.sol            # DAO governance contract
-│   │   └── token.sol          # CLT token contract
-│   ├── script/                 # Deployment scripts
-│   └── test/                   # Contract tests
+climalink/
+├── components/           # Reusable UI components
+│   ├── ui/              # Base UI components (buttons, cards, etc.)
+│   ├── dashboard/       # Dashboard-specific components
+│   ├── profile/         # User profile components
+│   ├── blockchain/      # Web3 integration components
+│   ├── navigation/      # Navigation components
+│   └── validation/      # Report validation components
+├── contexts/            # React context providers
+│   ├── role-context.tsx # User role management
+│   └── web3-context.tsx # Blockchain connection
+├── lib/                 # Utility libraries
+│   ├── contracts.ts     # Smart contract ABIs and addresses
+│   ├── web3.ts         # Web3 utility functions
+│   └── utils.ts        # General utilities
+├── app/                # Next.js app router pages
+│   ├── dashboard/      # Main dashboard
+│   ├── submit/         # Report submission
+│   ├── validate/       # Report validation
+│   ├── portfolio/      # Token management
+│   ├── profile/        # User profile
+│   └── blockchain/     # Blockchain interactio
+└── public/             # Static assets
 ```
-
----
 
 ## Usage Guide
 
