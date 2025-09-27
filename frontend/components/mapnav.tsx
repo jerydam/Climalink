@@ -154,7 +154,7 @@ const DramaticMap: React.FC<MapProps> = ({ onLocationFound }) => {
           ) : !isMapReady ? (
             "🗺️ Loading Map..."
           ) : (
-            "🎯 Find My Location"
+            "🎯 Predict Weather Forecast"
           )}
         </button>
 
@@ -180,7 +180,7 @@ const DramaticMap: React.FC<MapProps> = ({ onLocationFound }) => {
                 aria-label="Loading"
               />
               <span className="text-lg font-medium">
-                Preparing dramatic journey...
+                Preparing...
               </span>
             </div>
           </div>

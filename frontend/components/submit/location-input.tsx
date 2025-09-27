@@ -7,16 +7,44 @@ import { Input } from "@/components/ui/input"
 import { MapPinIcon, GlobeAltIcon } from "@heroicons/react/24/outline"
 import { Loader2, MapPin } from "lucide-react"
 
+interface WeatherData {
+  temperature: number
+  humidity: number
+  weather: string
+  notes: string
+}
+
+interface FetchedWeatherData {
+  current?: {
+    temperature: number
+    humidity: number
+    weatherCondition: string
+  }
+}
+
 interface LocationInputProps {
   location: string
   coordinates: { lat: number; lng: number }
   onLocationChange: (location: string, coordinates: { lat: number; lng: number }) => void
+  onWeatherDataFetched?: (weatherData: WeatherData) => void
+  isFetchingWeather?: boolean
+  weatherFetchError?: string | null
+  onWeatherFetchError?: (error: string | null) => void
 }
 
-export function LocationInput({ location, coordinates, onLocationChange }: LocationInputProps) {
+export function LocationInput({ 
+  location, 
+  coordinates, 
+  onLocationChange, 
+  onWeatherDataFetched,
+  isFetchingWeather = false,
+  weatherFetchError,
+  onWeatherFetchError
+}: LocationInputProps) {
   const [inputValue, setInputValue] = useState(location)
   const [isGettingLocation, setIsGettingLocation] = useState(false)
   const [locationError, setLocationError] = useState("")
+  const [isUsingCurrentLocation, setIsUsingCurrentLocation] = useState(false)
 
   // Update input value when location prop changes
   useEffect(() => {
@@ -55,6 +83,106 @@ export function LocationInput({ location, coordinates, onLocationChange }: Locat
     
     // Default to current coordinates if no match found
     return coordinates
+  }
+
+  // Function to get user's current location and fetch weather
+  const handleUseCurrentLocationAndWeather = async () => {
+    setIsUsingCurrentLocation(true)
+    setIsGettingLocation(true)
+    setLocationError("")
+    onWeatherFetchError?.(null)
+
+    try {
+      // Get user's current position
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        if (!navigator.geolocation) {
+          reject(new Error("Geolocation is not supported by this browser"))
+          return
+        }
+
+        navigator.geolocation.getCurrentPosition(
+          resolve,
+          reject,
+          { 
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 60000 
+          }
+        )
+      })
+
+      const lat = position.coords.latitude
+      const lng = position.coords.longitude
+
+      // Update coordinates
+      onLocationChange(location, { lat, lng })
+
+      // Reverse geocode to get location name
+      let locationName = `Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`
+      try {
+        const geoRes = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`
+        )
+        const geoData = await geoRes.json()
+        
+        locationName = geoData.display_name || 
+          `${geoData.address?.road || "Unknown road"}, ${
+            geoData.address?.city ||
+            geoData.address?.town ||
+            geoData.address?.village ||
+            "Unknown place"
+          }`
+        
+      } catch (error) {
+        console.warn("Failed to reverse geocode:", error)
+      }
+
+      // Update location
+      onLocationChange(locationName, { lat, lng })
+      setInputValue(locationName)
+
+      // Fetch weather data if callback is provided
+      if (onWeatherDataFetched) {
+        try {
+          const weatherRes = await fetch(`/api/weather?latitude=${lat}&longitude=${lng}`)
+          
+          if (!weatherRes.ok) {
+            throw new Error(`Weather API returned ${weatherRes.status}`)
+          }
+
+          const fetchedWeather: FetchedWeatherData = await weatherRes.json()
+          
+          // Update weather data with fetched information
+          if (fetchedWeather.current) {
+            const weatherData: WeatherData = {
+              temperature: fetchedWeather.current.temperature,
+              humidity: fetchedWeather.current.humidity,
+              weather: fetchedWeather.current.weatherCondition.toLowerCase(),
+              notes: `Automatically fetched from current location at ${new Date().toLocaleString()}`
+            }
+            onWeatherDataFetched(weatherData)
+          } else {
+            throw new Error("No current weather data available")
+          }
+
+        } catch (weatherError) {
+          console.warn("Weather fetch failed:", weatherError)
+          onWeatherFetchError?.("Weather data not available, please enter manually")
+        }
+      }
+
+    } catch (error) {
+      console.error("Failed to get current location:", error)
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : "Failed to get your current location"
+      
+      setLocationError(errorMessage)
+      onWeatherFetchError?.(errorMessage)
+    } finally {
+      setIsGettingLocation(false)
+      setIsUsingCurrentLocation(false)
+    }
   }
 
   const getCurrentLocation = () => {
@@ -140,32 +268,46 @@ export function LocationInput({ location, coordinates, onLocationChange }: Locat
           </div>
         </div>
 
-        {/* GPS Location Button */}
-        <div className="space-y-3">
-          <Button
-            onClick={getCurrentLocation}
-            disabled={isGettingLocation}
-            className="w-full"
-            variant="outline"
-          >
-            {isGettingLocation ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Getting Location...
-              </>
-            ) : (
-              <>
-                <MapPin className="w-4 h-4 mr-2" />
-                Use Current Location
-              </>
-            )}
-          </Button>
-        </div>
+        {/* Use Current Location & Weather Button */}
+        {onWeatherDataFetched && (
+          <div className="space-y-3">
+            <div className="bg-green-50 border border-green-200 p-3 rounded-lg">
+              <h4 className="font-medium text-green-800 mb-1">Auto-fetch Weather Data</h4>
+              <p className="text-sm text-green-700 mb-3">
+                Get your current location and automatically fetch real-time weather data for more accurate reporting.
+              </p>
+              <Button 
+                onClick={handleUseCurrentLocationAndWeather}
+                disabled={isFetchingWeather || isUsingCurrentLocation || isGettingLocation}
+                variant="default"
+                className="w-full bg-green-600 hover:bg-green-700"
+              >
+                {isFetchingWeather || isUsingCurrentLocation ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    {isUsingCurrentLocation ? "Getting location..." : "Fetching weather..."}
+                  </>
+                ) : (
+                  <>
+                    <MapPin className="h-4 w-4 mr-2" />
+                    Use Current Location & Weather
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        )}
 
-        {/* Error Message */}
+        {/* Error Messages */}
         {locationError && (
           <div className="text-sm text-destructive bg-destructive/10 p-3 rounded-lg">
             {locationError}
+          </div>
+        )}
+        
+        {weatherFetchError && (
+          <div className="text-sm text-orange-800 bg-orange-50 border border-orange-200 p-3 rounded-lg">
+            {weatherFetchError}
           </div>
         )}
 
