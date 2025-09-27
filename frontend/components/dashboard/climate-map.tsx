@@ -46,6 +46,12 @@ export function ClimateMap() {
       try {
         setIsLoading(true)
         const climateContract = getContract("CLIMATE")
+        
+        if (!climateContract) {
+          console.error("Climate contract not available")
+          setIsLoading(false)
+          return
+        }
 
         // Get total report count
         const reportCount = await climateContract.reportCount()
@@ -57,21 +63,22 @@ export function ClimateMap() {
 
         for (let i = startIndex; i < Number(reportCount); i++) {
           try {
-            const reportData = await climateContract.getClimateReport(i)
+            // Using the correct method name from ABI
+            const reportData = await climateContract.getReport(i)
             
             // Only show valid reports on the map
             if (reportData.status === 1) { // 1 = Valid
               reports.push({
                 id: i.toString(),
-                location: reportData.location,
-                weather: reportData.weather,
-                temperature: Number(reportData.temperature) / 100, // Convert from int128 format
-                humidity: Number(reportData.humidity),
+                location: reportData.data.location,
+                weather: reportData.data.weather,
+                temperature: Number(reportData.data.temperature) / 100, // Convert from int128 format
+                humidity: Number(reportData.data.humidity),
                 timestamp: Number(reportData.timestamp),
                 reporter: reportData.reporter,
                 coordinates: {
-                  lat: Number(reportData.latitude) / 1000000, // Convert from int128 format
-                  lng: Number(reportData.longitude) / 1000000,
+                  lat: Number(reportData.data.latitude) / 1000000, // Convert from int128 format
+                  lng: Number(reportData.data.longitude) / 1000000,
                 },
                 status: reportData.status,
               })

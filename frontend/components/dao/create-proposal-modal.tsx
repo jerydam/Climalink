@@ -15,7 +15,7 @@ import { useWeb3 } from "@/lib/web3"
 import { TransactionModal } from "@/components/blockchain/transaction-modal"
 
 export function CreateProposalModal() {
-  const { getContract } = useWeb3()
+  const { getContract, isConnected, isCorrectNetwork } = useWeb3()
   
   const [open, setOpen] = useState(false)
   const [showTxModal, setShowTxModal] = useState(false)
@@ -40,7 +40,15 @@ export function CreateProposalModal() {
   }
 
   const handleCreateProposal = async (): Promise<string> => {
+    if (!isConnected || !isCorrectNetwork) {
+      throw new Error("Please connect to the BlockDAG network")
+    }
+
     const daoContract = getContract("DAO")
+    
+    if (!daoContract) {
+      throw new Error("DAO contract not available")
+    }
     
     // Convert duration from days to seconds
     const durationInSeconds = parseInt(formData.duration) * 24 * 60 * 60
@@ -88,6 +96,15 @@ export function CreateProposalModal() {
                 DAO members can create proposals to improve the platform. Proposals require majority vote (51% quorum) to pass and have a 1-hour voting delay.
               </AlertDescription>
             </Alert>
+
+            {!isCorrectNetwork && (
+              <Alert className="bg-red-50 border-red-200">
+                <AlertCircle className="h-4 w-4 text-red-600" />
+                <AlertDescription className="text-red-800">
+                  Please connect to the BlockDAG network to create proposals.
+                </AlertDescription>
+              </Alert>
+            )}
 
             <Alert className="bg-amber-50 border-amber-200">
               <AlertCircle className="h-4 w-4 text-amber-600" />
@@ -196,7 +213,7 @@ export function CreateProposalModal() {
               <Button 
                 type="submit" 
                 className="bg-climate-green hover:bg-climate-green/90"
-                disabled={!isFormValid()}
+                disabled={!isFormValid() || !isCorrectNetwork}
               >
                 Create Proposal
               </Button>

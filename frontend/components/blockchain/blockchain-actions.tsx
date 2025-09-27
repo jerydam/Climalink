@@ -15,26 +15,34 @@ export function BlockchainActions() {
 
   const handleJoinAsReporter = async (): Promise<string> => {
     const climateContract = getContract("CLIMATE")
-    const tx = await climateContract.joinAsReporterOrValidator()
+    if (!climateContract) throw new Error("Climate contract not available")
+    
+    const tx = await climateContract.joinSystem()
     return tx.hash
   }
 
   const handleStakeBDAG = async (): Promise<string> => {
     const tokenContract = getContract("TOKEN")
+    if (!tokenContract) throw new Error("Token contract not available")
+    
     const tx = await tokenContract.stakeBDAG()
     return tx.hash
   }
 
   const handleUpgradeToValidator = async (): Promise<string> => {
-    // First stake BDAG, then check for role upgrade
+    // First stake BDAG, then upgrade
     const tokenContract = getContract("TOKEN")
+    if (!tokenContract) throw new Error("Token contract not available")
+    
     const tx = await tokenContract.stakeBDAG()
     
     // After staking, try to upgrade role
     setTimeout(async () => {
       try {
         const climateContract = getContract("CLIMATE")
-        await climateContract.checkAndUpgradeRole(account!)
+        if (climateContract) {
+          await climateContract.upgradeToValidator()
+        }
       } catch (error) {
         console.error("Role upgrade failed:", error)
       }
@@ -45,52 +53,60 @@ export function BlockchainActions() {
 
   const handleUnstakeBDAG = async (): Promise<string> => {
     const tokenContract = getContract("TOKEN")
+    if (!tokenContract) throw new Error("Token contract not available")
+    
     const tx = await tokenContract.unstakeBDAG()
     return tx.hash
   }
 
   const handleJoinDAO = async (): Promise<string> => {
     const daoContract = getContract("DAO")
+    if (!daoContract) throw new Error("DAO contract not available")
+    
     const tx = await daoContract.joinDao()
     return tx.hash
   }
 
   const handleSubmitReport = async (): Promise<string> => {
     const climateContract = getContract("CLIMATE")
+    if (!climateContract) throw new Error("Climate contract not available")
     
     // Sample report data - in a real app this would come from a form
     const reportData = {
       weather: "sunny",
-      temperature: 2500, // 25.00°C in int128 format (scaled by 100)
-      humidity: 65,
       location: "New York, NY",
+      temperature: 2500, // 25.00°C in int128 format (scaled by 100)
       longitude: -74006000, // -74.006° in int128 format (scaled by 1000000)
       latitude: 40714000,   // 40.714° in int128 format (scaled by 1000000)
+      humidity: 65,
     }
     
-    const tx = await climateContract.createClimateReport(reportData)
+    const tx = await climateContract.createReport(reportData)
     return tx.hash
   }
 
   const handleValidateReport = async (): Promise<string> => {
     const climateContract = getContract("CLIMATE")
+    if (!climateContract) throw new Error("Climate contract not available")
     
     // Get active reports for validation
-    const activeReports = await climateContract.getActiveVotingReports()
+    const activeReports = await climateContract.getActiveReports()
     if (activeReports.length === 0) {
       throw new Error("No reports available for validation")
     }
     
-    const reportIndex = activeReports[0] // First available report
-    const isValid = 1 // VoteChoice.Valid
+    const reportId = activeReports[0] // First available report
+    const voteChoice = 1 // VoteChoice.Valid = 1 (assuming 0=Invalid, 1=Valid)
     
-    const tx = await climateContract.voteOnReport(reportIndex, isValid)
+    const tx = await climateContract.vote(reportId, voteChoice)
     return tx.hash
   }
 
   const handleCheckRoleUpgrade = async (): Promise<string> => {
     const climateContract = getContract("CLIMATE")
-    const tx = await climateContract.checkAndUpgradeRole(account!)
+    if (!climateContract) throw new Error("Climate contract not available")
+    
+    const tx = await climateContract.upgradeToValidator()
     return tx.hash
   }
 
@@ -301,7 +317,7 @@ export function BlockchainActions() {
         isOpen={activeModal === "stake-and-join"}
         onClose={() => setActiveModal(null)}
         title="Stake BDAG & Join as Validator"
-        description="Stake 100 BDAG tokens to become a Validator. You'll receive 1000 CLT tokens immediately as a bonus, then earn rewards by correctly validating community reports. Winning validators share additional reward pools. Tokens are locked for 60 days."
+        description="Stake 100 BDAG tokens to become a Validator. You'll receive 1000 CLT tokens immediately as a bonus, then earn rewards by correctly validating community reports. Tokens are locked for 60 days."
         onConfirm={handleUpgradeToValidator}
       />
 

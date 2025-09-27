@@ -125,7 +125,7 @@ export default function ValidatePage() {
   const [accuracyRate, setAccuracyRate] = useState(0)
   const [totalRewards, setTotalRewards] = useState(0)
 
-  const { isConnected, getContract, account, provider } = useWeb3()
+  const { isConnected, getContract, account, provider, isCorrectNetwork } = useWeb3()
   const { userRole, isLoading: roleLoading, isMember } = useRole()
   const router = useRouter()
 
@@ -137,7 +137,7 @@ export default function ValidatePage() {
 
   useEffect(() => {
     const fetchReports = async () => {
-      if (!isConnected || !account || !provider) {
+      if (!isConnected || !account || !provider || !isCorrectNetwork) {
         setIsLoading(false)
         return
       }
@@ -145,6 +145,12 @@ export default function ValidatePage() {
       try {
         setIsLoading(true)
         const climateContract = getContract("CLIMATE")
+        
+        if (!climateContract) {
+          console.error("Climate contract not available")
+          setIsLoading(false)
+          return
+        }
 
         // Get total report count
         const reportCount = await climateContract.reportCount()
@@ -155,29 +161,30 @@ export default function ValidatePage() {
         
         for (let i = Math.max(0, Number(reportCount) - maxReports); i < Number(reportCount); i++) {
           try {
-            const reportData = await climateContract.getClimateReport(i)
+            // Use correct function name from ABI
+            const reportData = await climateContract.getReport(i)
             
             // Only show pending reports for validation
             if (reportData.status === 0) { // 0 = Pending
-              const weatherIcon = weatherIcons[reportData.weather.toLowerCase()] || "🌤️"
+              const weatherIcon = weatherIcons[reportData.data.weather.toLowerCase()] || "🌤️"
               const timeAgo = calculateTimeAgo(Number(reportData.timestamp) * 1000)
 
               reports.push({
                 id: i.toString(),
-                location: reportData.location,
-                weather: reportData.weather,
-                temperature: Number(reportData.temperature) / 100, // Convert from int128 format
-                humidity: Number(reportData.humidity),
+                location: reportData.data.location,
+                weather: reportData.data.weather,
+                temperature: Number(reportData.data.temperature) / 100, // Convert from int128 format
+                humidity: Number(reportData.data.humidity),
                 timeAgo,
                 reporter: formatAddress(reportData.reporter),
                 weatherIcon,
                 submittedAt: new Date(Number(reportData.timestamp) * 1000).toLocaleString(),
                 coordinates: {
-                  lat: Number(reportData.latitude) / 1000000,
-                  lng: Number(reportData.longitude) / 1000000,
+                  lat: Number(reportData.data.latitude) / 1000000,
+                  lng: Number(reportData.data.longitude) / 1000000,
                 },
                 status: reportData.status,
-                validationCount: Number(reportData.validationCount),
+                validationCount: Number(reportData.validVotes) + Number(reportData.invalidVotes),
               })
             }
           } catch (error) {
@@ -200,60 +207,43 @@ export default function ValidatePage() {
     }
 
     fetchReports()
-  }, [isConnected, account, provider, getContract])
+  }, [isConnected, account, provider, getContract, isCorrectNetwork])
 
   const fetchValidationHistory = async () => {
-    if (!isConnected || !account || !provider) return
+    if (!isConnected || !account || !provider || !isCorrectNetwork) return
 
     try {
       const climateContract = getContract("CLIMATE")
+      
+      if (!climateContract) {
+        console.error("Climate contract not available")
+        return
+      }
+
       const currentBlock = await provider.getBlockNumber()
       const fromBlock = Math.max(0, currentBlock - 10000)
 
-      // Fetch validation events for this user
-      const validatedEvents = await climateContract.queryFilter(
-        climateContract.filters.ReportValidated(null, account),
-        fromBlock,
-        currentBlock
-      )
-
-      const rejectedEvents = await climateContract.queryFilter(
-        climateContract.filters.ReportRejected(null, account),
+      // Fetch validation events for this user using the correct event name from ABI
+      const voteEvents = await climateContract.queryFilter(
+        climateContract.filters.ReportVoteCast(null, account),
         fromBlock,
         currentBlock
       )
 
       const history: ValidationRecord[] = []
       
-      // Process validated events
-      for (const event of validatedEvents) {
+      // Process vote events
+      for (const event of voteEvents) {
         const block = await event.getBlock()
         const reportId = event.args?.[0]?.toString() || ""
+        const voteChoice = event.args?.[2] || 0 // 0 = Invalid, 1 = Valid
         
         try {
-          const reportData = await climateContract.getClimateReport(reportId)
+          const reportData = await climateContract.getReport(reportId)
           history.push({
             reportId,
-            location: reportData.location,
-            decision: "valid",
-            date: new Date(Number(block.timestamp) * 1000).toLocaleDateString()
-          })
-        } catch (error) {
-          console.error("Error fetching report data for history:", error)
-        }
-      }
-
-      // Process rejected events
-      for (const event of rejectedEvents) {
-        const block = await event.getBlock()
-        const reportId = event.args?.[0]?.toString() || ""
-        
-        try {
-          const reportData = await climateContract.getClimateReport(reportId)
-          history.push({
-            reportId,
-            location: reportData.location,
-            decision: "invalid",
+            location: reportData.data.location,
+            decision: voteChoice === 1 ? "valid" : "invalid",
             date: new Date(Number(block.timestamp) * 1000).toLocaleDateString()
           })
         } catch (error) {
@@ -265,7 +255,7 @@ export default function ValidatePage() {
       history.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
       setValidationHistory(history.slice(0, 10)) // Keep last 10 validations
 
-      // Calculate accuracy rate
+      // Calculate accuracy rate (simplified)
       const totalValidations = history.length
       const validValidations = history.filter(h => h.decision === "valid").length
       const accuracy = totalValidations > 0 ? (validValidations / totalValidations) * 100 : 0
@@ -304,26 +294,42 @@ export default function ValidatePage() {
     setIsModalOpen(false)
   }
 
-  const handleConfirmValidation = async () => {
-    if (!pendingValidation) return
+  const handleConfirmValidation = async (): Promise<string> => {
+    if (!pendingValidation) {
+      throw new Error("No pending validation")
+    }
+
+    if (!isConnected || !isCorrectNetwork) {
+      throw new Error("Please connect to the BlockDAG network")
+    }
+
+    const climateContract = getContract("CLIMATE")
+    if (!climateContract) {
+      throw new Error("Climate contract not available")
+    }
 
     try {
-      const climateContract = getContract("CLIMATE")
-      const tx = await climateContract.validateReport(
+      // Use correct function name and enum values from ABI
+      // VoteChoice enum: 0 = Invalid, 1 = Valid
+      const voteChoice = pendingValidation.isValid ? 1 : 0
+      
+      const tx = await climateContract.vote(
         pendingValidation.reportId,
-        pendingValidation.isValid
+        voteChoice
       )
-      await tx.wait()
 
-      // Refresh reports and history
+      // Remove the validated report from the list
       setReports(prev => prev.filter(r => r.id !== pendingValidation.reportId))
-      await fetchValidationHistory()
+      
+      // Refresh validation history
+      setTimeout(() => {
+        fetchValidationHistory()
+      }, 2000)
+
+      return tx.hash
     } catch (error) {
       console.error("Error validating report:", error)
       throw error
-    } finally {
-      setPendingValidation(null)
-      setIsTransactionModalOpen(false)
     }
   }
 
@@ -360,6 +366,15 @@ export default function ValidatePage() {
               Review and validate weather reports from the community to ensure data accuracy
             </p>
           </div>
+
+          {/* Network Warning */}
+          {!isCorrectNetwork && (
+            <Card className="border-red-200 bg-red-50">
+              <CardContent className="p-4">
+                <p className="text-red-800 font-medium">⚠️ Please connect to the BlockDAG network to validate reports</p>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Filters */}
           <ReportFilters

@@ -34,12 +34,12 @@ export function EarningsAnalytics() {
   })
   
   const [isLoading, setIsLoading] = useState(true)
-  const { account, isConnected, getContract, provider } = useWeb3()
+  const { account, isConnected, getContract, provider, isCorrectNetwork } = useWeb3()
   const { userRole } = useRole()
 
   useEffect(() => {
     const fetchEarningsData = async () => {
-      if (!isConnected || !account || !provider) {
+      if (!isConnected || !account || !provider || !isCorrectNetwork) {
         setIsLoading(false)
         return
       }
@@ -49,6 +49,12 @@ export function EarningsAnalytics() {
         const tokenContract = getContract("TOKEN")
         const climateContract = getContract("CLIMATE")
         const daoContract = getContract("DAO")
+
+        if (!tokenContract) {
+          console.error("Token contract not available")
+          setIsLoading(false)
+          return
+        }
 
         const currentBlock = await provider.getBlockNumber()
         const fromBlock = Math.max(0, currentBlock - 100000) // Look back ~100k blocks
@@ -103,7 +109,7 @@ export function EarningsAnalytics() {
         }
 
         // Calculate validation earnings for validators/DAO members
-        if (userRole === "validator" || userRole === "dao_member") {
+        if ((userRole === "validator" || userRole === "dao_member") && climateContract) {
           try {
             const validationEvents = await climateContract.queryFilter(
               climateContract.filters.ReportVoteCast(null, account),
@@ -119,7 +125,7 @@ export function EarningsAnalytics() {
         }
 
         // Calculate DAO participation rewards
-        if (userRole === "dao_member") {
+        if (userRole === "dao_member" && daoContract) {
           try {
             const voteEvents = await daoContract.queryFilter(
               daoContract.filters.VoteCast(null, account),
@@ -158,7 +164,31 @@ export function EarningsAnalytics() {
     }
 
     fetchEarningsData()
-  }, [account, isConnected, getContract, provider, userRole])
+  }, [account, isConnected, getContract, provider, userRole, isCorrectNetwork])
+
+  if (!isConnected) {
+    return (
+      <Card className="mb-8">
+        <CardContent className="pt-6">
+          <div className="text-center py-8">
+            <p className="text-muted-foreground">Connect your wallet to view earnings analytics</p>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (!isCorrectNetwork) {
+    return (
+      <Card className="mb-8">
+        <CardContent className="pt-6">
+          <div className="text-center py-8">
+            <p className="text-muted-foreground">Please connect to the BlockDAG network to view earnings analytics</p>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
 
   if (isLoading) {
     return (

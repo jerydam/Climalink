@@ -64,6 +64,11 @@ export function ContractInteractions() {
       const climateContract = getContract("CLIMATE")
       const daoContract = getContract("DAO")
 
+      if (!tokenContract || !climateContract || !daoContract) {
+        console.error("Contracts not available")
+        return
+      }
+
       // Fetch basic balances and staking info
       const [cltBalance, stakedAmount, unlockTime, isEligibleForMinting] = await Promise.all([
         tokenContract.balanceOf(account),
@@ -91,22 +96,20 @@ export function ContractInteractions() {
       // Count user's reports using events (more efficient than iterating)
       try {
         const reportEvents = await climateContract.queryFilter(
-          climateContract.filters.ClimateEvent(),
+          climateContract.filters.ReportCreated(null, account),
           fromBlock,
           currentBlock
         )
         
-        // Filter for reports by this user
+        // For each report by this user, check its status
         for (const event of reportEvents) {
           try {
-            const reportIndex = event.args?.[0]
-            if (reportIndex) {
-              const report = await climateContract.getClimateReport(reportIndex)
-              if (report.reporter.toLowerCase() === account.toLowerCase()) {
-                reportsSubmitted++
-                if (report.status === 1) { // ReportStatus.Validated
-                  validReports++
-                }
+            const reportId = event.args?.[0]
+            if (reportId) {
+              const report = await climateContract.getReport(reportId)
+              reportsSubmitted++
+              if (report.status === 1) { // ReportStatus.Valid
+                validReports++
               }
             }
           } catch (error) {
@@ -121,10 +124,10 @@ export function ContractInteractions() {
           const maxCheck = Math.min(Number(reportCount), 50) // Check last 50 reports only
           for (let i = Math.max(1, Number(reportCount) - maxCheck + 1); i <= Number(reportCount); i++) {
             try {
-              const report = await climateContract.getClimateReport(i)
+              const report = await climateContract.getReport(i)
               if (report.reporter.toLowerCase() === account.toLowerCase()) {
                 reportsSubmitted++
-                if (report.status === 1) { // ReportStatus.Validated
+                if (report.status === 1) { // ReportStatus.Valid
                   validReports++
                 }
               }
@@ -418,7 +421,7 @@ export function ContractInteractions() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{stats.validationsPerformed}</div>
-                <p className="text-xs text-muted-foreground">Reports Validated (24h periods)</p>
+                <p className="text-xs text-muted-foreground">Reports Validated</p>
               </CardContent>
             </Card>
           )}

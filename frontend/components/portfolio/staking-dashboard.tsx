@@ -41,11 +41,11 @@ export function StakingDashboard() {
   const [showStakeModal, setShowStakeModal] = useState(false)
   const [showUnstakeModal, setShowUnstakeModal] = useState(false)
   
-  const { account, isConnected, getContract, provider } = useWeb3()
+  const { account, isConnected, getContract, provider, isCorrectNetwork } = useWeb3()
 
   useEffect(() => {
     const fetchStakingData = async () => {
-      if (!isConnected || !account || !provider) {
+      if (!isConnected || !account || !provider || !isCorrectNetwork) {
         setIsLoading(false)
         return
       }
@@ -53,6 +53,12 @@ export function StakingDashboard() {
       try {
         setIsLoading(true)
         const tokenContract = getContract("TOKEN")
+        
+        if (!tokenContract) {
+          console.error("Token contract not available")
+          setIsLoading(false)
+          return
+        }
 
         // Fetch staking information
         const [
@@ -108,7 +114,7 @@ export function StakingDashboard() {
     }
 
     fetchStakingData()
-  }, [account, isConnected, getContract, provider])
+  }, [account, isConnected, getContract, provider, isCorrectNetwork])
 
   const getUnlockProgress = () => {
     if (!stakingData.isStakeActive || stakingData.unlockTime === 0) return 0
@@ -140,7 +146,15 @@ export function StakingDashboard() {
   }
 
   const handleStakeBDAG = async (): Promise<string> => {
+    if (!isConnected || !isCorrectNetwork) {
+      throw new Error("Please connect to the BlockDAG network")
+    }
+
     const tokenContract = getContract("TOKEN")
+    if (!tokenContract) {
+      throw new Error("Token contract not available")
+    }
+
     const tx = await tokenContract.stakeBDAG()
     
     // Refresh data after transaction
@@ -152,7 +166,15 @@ export function StakingDashboard() {
   }
 
   const handleUnstakeBDAG = async (): Promise<string> => {
+    if (!isConnected || !isCorrectNetwork) {
+      throw new Error("Please connect to the BlockDAG network")
+    }
+
     const tokenContract = getContract("TOKEN")
+    if (!tokenContract) {
+      throw new Error("Token contract not available")
+    }
+
     const tx = await tokenContract.unstakeBDAG()
     
     // Refresh data after transaction
@@ -161,6 +183,30 @@ export function StakingDashboard() {
     }, 3000)
     
     return tx.hash
+  }
+
+  if (!isConnected) {
+    return (
+      <Card className="mb-8">
+        <CardContent className="pt-6">
+          <div className="text-center py-8">
+            <p className="text-muted-foreground">Connect your wallet to view staking information</p>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (!isCorrectNetwork) {
+    return (
+      <Card className="mb-8">
+        <CardContent className="pt-6">
+          <div className="text-center py-8">
+            <p className="text-muted-foreground">Please connect to the BlockDAG network to view staking information</p>
+          </div>
+        </CardContent>
+      </Card>
+    )
   }
 
   if (isLoading) {
@@ -253,7 +299,7 @@ export function StakingDashboard() {
                 <Button 
                   className="w-full bg-sky-blue hover:bg-sky-blue/90"
                   onClick={() => setShowStakeModal(true)}
-                  disabled={!canStakeMore()}
+                  disabled={!canStakeMore() || !isCorrectNetwork}
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   Stake {stakingData.minimumStake} BDAG
@@ -264,7 +310,7 @@ export function StakingDashboard() {
                     variant="outline"
                     className="w-full"
                     onClick={() => setShowUnstakeModal(true)}
-                    disabled={!isUnlockTime()}
+                    disabled={!isUnlockTime() || !isCorrectNetwork}
                   >
                     <Coins className="h-4 w-4 mr-2" />
                     {isUnlockTime() ? "Unstake All BDAG" : `Unlock in ${getDaysLeft()} days`}

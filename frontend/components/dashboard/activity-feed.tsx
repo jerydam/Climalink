@@ -37,6 +37,12 @@ export function ActivityFeed() {
         const climateContract = getContract("CLIMATE")
         const daoContract = getContract("DAO")
 
+        if (!tokenContract || !climateContract || !daoContract) {
+          console.error("Contracts not available")
+          setIsLoading(false)
+          return
+        }
+
         const activities: Activity[] = []
 
         // Get current block number and look back for recent activities
@@ -95,9 +101,9 @@ export function ActivityFeed() {
         }
 
         try {
-          // Fetch climate report events
+          // Fetch climate report events (corrected event name)
           const reportEvents = await climateContract.queryFilter(
-            climateContract.filters.ClimateEvent(),
+            climateContract.filters.ReportCreated(null, account),
             fromBlock,
             currentBlock
           )
@@ -106,22 +112,20 @@ export function ActivityFeed() {
             const block = await event.getBlock()
             const reportId = event.args?.[0] || 0
             
-            // Check if this report belongs to current user
+            // Check the status of this report
             try {
-              const report = await climateContract.getClimateReport(reportId)
-              if (report.reporter.toLowerCase() === account.toLowerCase()) {
-                const status = report.status === 1 ? "validated" : report.status === 2 ? "rejected" : "pending"
-                activities.push({
-                  id: `report-${event.transactionHash}`,
-                  type: "report",
-                  message: `Weather report #${reportId} ${status}`,
-                  reward: status === "validated" ? "+20 CLT" : null,
-                  time: formatTimeAgo(Number(block.timestamp) * 1000),
-                  icon: DocumentTextIcon,
-                  color: status === "validated" ? "text-climate-green" : "text-amber-500",
-                  txHash: event.transactionHash,
-                })
-              }
+              const report = await climateContract.getReport(reportId)
+              const status = report.status === 1 ? "validated" : report.status === 2 ? "rejected" : "pending"
+              activities.push({
+                id: `report-${event.transactionHash}`,
+                type: "report",
+                message: `Weather report #${reportId} ${status}`,
+                reward: status === "validated" ? "+20 CLT" : null,
+                time: formatTimeAgo(Number(block.timestamp) * 1000),
+                icon: DocumentTextIcon,
+                color: status === "validated" ? "text-climate-green" : "text-amber-500",
+                txHash: event.transactionHash,
+              })
             } catch (reportError) {
               // Skip if can't get report details
               continue
@@ -310,7 +314,7 @@ export function ActivityFeed() {
                     <p className="text-xs text-muted-foreground">{activity.time}</p>
                     {activity.txHash && (
                       <button
-                        onClick={() => window.open(`https://etherscan.io/tx/${activity.txHash}`, "_blank")}
+                        onClick={() => window.open(`https://bdagscan.com/tx/${activity.txHash}`, "_blank")}
                         className="text-xs text-blue-500 hover:text-blue-600 underline"
                       >
                         View Tx

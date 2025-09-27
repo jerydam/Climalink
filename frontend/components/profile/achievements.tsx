@@ -47,6 +47,12 @@ export function Achievements() {
         const tokenContract = getContract("TOKEN")
         const daoContract = getContract("DAO")
 
+        if (!climateContract || !tokenContract || !daoContract) {
+          console.error("Contracts not available")
+          setIsLoading(false)
+          return
+        }
+
         // Initialize tracking variables
         let reportsSubmitted = 0
         let validReports = 0
@@ -57,7 +63,6 @@ export function Achievements() {
         let consecutiveDays = 0
         let isDAOMember = false
         let reportDates: number[] = []
-        let validationAccuracy = 0
 
         // Get current block for time range
         const currentBlock = await provider.getBlockNumber()
@@ -72,25 +77,62 @@ export function Achievements() {
         const balance = await tokenContract.balanceOf(account)
         cltBalance = Number(balance) / 1e18
 
-        // Fetch user's reports
-        const reportCount = await climateContract.reportCount()
-        for (let i = 0; i < Math.min(Number(reportCount), 200); i++) {
+        // Fetch user's reports using the correct event name and method
+        try {
+          const reportEvents = await climateContract.queryFilter(
+            climateContract.filters.ReportCreated(null, account),
+            fromBlock,
+            currentBlock
+          )
+
+          for (const event of reportEvents) {
+            try {
+              const reportId = event.args?.[0]
+              if (reportId) {
+                const report = await climateContract.getReport(reportId)
+                reportsSubmitted++
+                reportDates.push(Number(report.timestamp))
+                
+                // Track unique locations
+                const location = report.data.location.split(',')[0].trim()
+                uniqueLocations.add(location.toLowerCase())
+                
+                if (report.status === 1) { // Valid report
+                  validReports++
+                }
+              }
+            } catch (error) {
+              continue
+            }
+          }
+        } catch (error) {
+          console.error("Error fetching report events:", error)
+          
+          // Fallback: check recent reports directly
           try {
-            const report = await climateContract.reports(i)
-            if (report.reporter.toLowerCase() === account.toLowerCase()) {
-              reportsSubmitted++
-              reportDates.push(Number(report.timestamp))
-              
-              // Track unique locations
-              const location = report.location.split(',')[0].trim()
-              uniqueLocations.add(location.toLowerCase())
-              
-              if (report.status === 1) { // Valid report
-                validReports++
+            const reportCount = await climateContract.reportCount()
+            const maxCheck = Math.min(Number(reportCount), 50)
+            
+            for (let i = Math.max(1, Number(reportCount) - maxCheck + 1); i <= Number(reportCount); i++) {
+              try {
+                const report = await climateContract.getReport(i)
+                if (report.reporter.toLowerCase() === account.toLowerCase()) {
+                  reportsSubmitted++
+                  reportDates.push(Number(report.timestamp))
+                  
+                  const location = report.data.location.split(',')[0].trim()
+                  uniqueLocations.add(location.toLowerCase())
+                  
+                  if (report.status === 1) {
+                    validReports++
+                  }
+                }
+              } catch (error) {
+                continue
               }
             }
           } catch (error) {
-            continue
+            console.error("Error with fallback report counting:", error)
           }
         }
 
@@ -115,21 +157,13 @@ export function Achievements() {
         // Fetch validation events
         if (userRole === "validator" || userRole === "dao_member") {
           try {
-            const validatedEvents = await climateContract.queryFilter(
-              climateContract.filters.ReportValidated(null, account),
+            const validationEvents = await climateContract.queryFilter(
+              climateContract.filters.ReportVoteCast(null, account),
               fromBlock,
               currentBlock
             )
             
-            const rejectedEvents = await climateContract.queryFilter(
-              climateContract.filters.ReportRejected(null, account),
-              fromBlock,
-              currentBlock
-            )
-
-            const totalValidations = validatedEvents.length + rejectedEvents.length
-            validationsPerformed = totalValidations
-            validationAccuracy = totalValidations > 0 ? (validatedEvents.length / totalValidations) * 100 : 0
+            validationsPerformed = validationEvents.length
           } catch (error) {
             console.error("Error fetching validation events:", error)
           }

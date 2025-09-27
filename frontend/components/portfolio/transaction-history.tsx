@@ -42,6 +42,12 @@ export function TransactionHistory() {
         const climateContract = getContract("CLIMATE")
         const daoContract = getContract("DAO")
 
+        if (!tokenContract || !climateContract || !daoContract) {
+          console.error("Contracts not available")
+          setIsLoading(false)
+          return
+        }
+
         const transactions: Transaction[] = []
 
         // Get current block number and look back more blocks for history
@@ -153,9 +159,9 @@ export function TransactionHistory() {
         }
 
         try {
-          // Fetch climate report events
+          // Fetch climate report events (using correct event name)
           const reportEvents = await climateContract.queryFilter(
-            climateContract.filters.ClimateEvent(),
+            climateContract.filters.ReportCreated(null, account),
             fromBlock,
             currentBlock
           )
@@ -163,25 +169,16 @@ export function TransactionHistory() {
           for (const event of reportEvents) {
             const block = await event.getBlock()
             const reportId = event.args?.[0] || 0
-            // Check if this report belongs to the current user
-            try {
-              const report = await climateContract.reports(reportId)
-              if (report.reporter.toLowerCase() === account.toLowerCase()) {
-                transactions.push({
-                  id: `report-${event.transactionHash}`,
-                  date: new Date(Number(block.timestamp) * 1000).toLocaleDateString(),
-                  type: "report",
-                  amount: "+20 CLT",
-                  status: "completed",
-                  description: `Climate report #${reportId} submitted`,
-                  txHash: event.transactionHash,
-                  blockNumber: event.blockNumber,
-                })
-              }
-            } catch (error) {
-              // Skip if can't fetch report details
-              continue
-            }
+            transactions.push({
+              id: `report-${event.transactionHash}`,
+              date: new Date(Number(block.timestamp) * 1000).toLocaleDateString(),
+              type: "report",
+              amount: "+20 CLT",
+              status: "completed",
+              description: `Climate report #${reportId} submitted`,
+              txHash: event.transactionHash,
+              blockNumber: event.blockNumber,
+            })
           }
         } catch (error) {
           console.error("Error fetching report events:", error)
@@ -190,27 +187,24 @@ export function TransactionHistory() {
         try {
           // Fetch validation events
           const validationEvents = await climateContract.queryFilter(
-            climateContract.filters.ReportValidated(),
+            climateContract.filters.ReportVoteCast(null, account),
             fromBlock,
             currentBlock
           )
 
           for (const event of validationEvents) {
-            const validator = event.args?.[1]
-            if (validator?.toLowerCase() === account.toLowerCase()) {
-              const block = await event.getBlock()
-              const reportId = event.args?.[0] || 0
-              transactions.push({
-                id: `validation-${event.transactionHash}`,
-                date: new Date(Number(block.timestamp) * 1000).toLocaleDateString(),
-                type: "validation",
-                amount: "+10 CLT",
-                status: "completed",
-                description: `Validated climate report #${reportId}`,
-                txHash: event.transactionHash,
-                blockNumber: event.blockNumber,
-              })
-            }
+            const block = await event.getBlock()
+            const reportId = event.args?.[0] || 0
+            transactions.push({
+              id: `validation-${event.transactionHash}`,
+              date: new Date(Number(block.timestamp) * 1000).toLocaleDateString(),
+              type: "validation",
+              amount: "+5 CLT",
+              status: "completed",
+              description: `Validated climate report #${reportId}`,
+              txHash: event.transactionHash,
+              blockNumber: event.blockNumber,
+            })
           }
         } catch (error) {
           console.error("Error fetching validation events:", error)
@@ -267,8 +261,9 @@ export function TransactionHistory() {
     return true
   })
 
-  const openEtherscan = (txHash: string) => {
-    window.open(`https://etherscan.io/tx/${txHash}`, "_blank")
+  const openBlockExplorer = (txHash: string) => {
+    // Update to use BlockDAG explorer
+    window.open(`https://bdagscan.com/tx/${txHash}`, "_blank")
   }
 
   return (
@@ -329,10 +324,10 @@ export function TransactionHistory() {
                     <div className="flex items-center gap-2 mt-1">
                       <p className="text-sm text-muted-foreground">{transaction.date}</p>
                       <button
-                        onClick={() => openEtherscan(transaction.txHash)}
+                        onClick={() => openBlockExplorer(transaction.txHash)}
                         className="text-sm text-blue-500 hover:text-blue-600 underline flex items-center gap-1"
                       >
-                        View on Etherscan
+                        View on BlockDAG Scan
                         <ExternalLink className="h-3 w-3" />
                       </button>
                     </div>

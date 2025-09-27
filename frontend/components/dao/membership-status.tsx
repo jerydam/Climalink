@@ -25,7 +25,7 @@ interface DAOMembershipData {
 }
 
 export function MembershipStatus() {
-  const { account, getContract, isConnected } = useWeb3()
+  const { account, getContract, isConnected, isCorrectNetwork } = useWeb3()
   const { userRole } = useRole()
   
   const [membershipData, setMembershipData] = useState<DAOMembershipData>({
@@ -45,10 +45,12 @@ export function MembershipStatus() {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    if (isConnected && account) {
+    if (isConnected && account && isCorrectNetwork) {
       loadMembershipData()
+    } else {
+      setIsLoading(false)
     }
-  }, [isConnected, account, userRole])
+  }, [isConnected, account, userRole, isCorrectNetwork])
 
   const loadMembershipData = async () => {
     if (!account) return
@@ -58,6 +60,11 @@ export function MembershipStatus() {
       
       const tokenContract = getContract("TOKEN")
       const daoContract = getContract("DAO")
+
+      if (!tokenContract || !daoContract) {
+        console.error("Contracts not available")
+        return
+      }
 
       // Get basic membership info
       const [isDaoMember, stakedAmount, cltBalance, totalMembers] = await Promise.all([
@@ -106,9 +113,9 @@ export function MembershipStatus() {
           if (proposal.proposer.toLowerCase() === account.toLowerCase()) {
             proposalsCreated++
             
-            if (proposal.status === 1) { // ProposalStatus.Executed
+            if (proposal.status === 1) { // ProposalStatus.Executed from ABI
               proposalsPassed++
-            } else if (proposal.status === 0) { // ProposalStatus.Active
+            } else if (proposal.status === 0) { // ProposalStatus.Active from ABI
               proposalsActive++
             }
           }
@@ -150,7 +157,9 @@ export function MembershipStatus() {
   }
 
   const handleRefresh = () => {
-    loadMembershipData()
+    if (isConnected && account && isCorrectNetwork) {
+      loadMembershipData()
+    }
   }
 
   const getDaysUntilUnlock = () => {
@@ -178,6 +187,18 @@ export function MembershipStatus() {
         <CardContent className="pt-6">
           <div className="text-center py-8">
             <p className="text-muted-foreground">Connect your wallet to view DAO membership status</p>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (!isCorrectNetwork) {
+    return (
+      <Card>
+        <CardContent className="pt-6">
+          <div className="text-center py-8">
+            <p className="text-muted-foreground">Please connect to the BlockDAG network to view membership status</p>
           </div>
         </CardContent>
       </Card>

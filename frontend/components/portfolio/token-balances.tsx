@@ -31,11 +31,11 @@ export function TokenBalances() {
   const [isUnstaking, setIsUnstaking] = useState(false)
   const [isClaiming, setIsClaiming] = useState(false)
   
-  const { account, isConnected, getContract } = useWeb3()
+  const { account, isConnected, getContract, isCorrectNetwork } = useWeb3()
 
   useEffect(() => {
     const fetchTokenData = async () => {
-      if (!isConnected || !account) {
+      if (!isConnected || !account || !isCorrectNetwork) {
         setIsLoading(false)
         return
       }
@@ -43,6 +43,12 @@ export function TokenBalances() {
       try {
         setIsLoading(true)
         const tokenContract = getContract("TOKEN")
+        
+        if (!tokenContract) {
+          console.error("Token contract not available")
+          setIsLoading(false)
+          return
+        }
 
         // Fetch CLT balance
         const cltBalance = await tokenContract.balanceOf(account)
@@ -81,7 +87,7 @@ export function TokenBalances() {
     }
 
     fetchTokenData()
-  }, [account, isConnected, getContract])
+  }, [account, isConnected, getContract, isCorrectNetwork])
 
   const handleTransfer = async () => {
     // In a real app, this would open a transfer modal
@@ -89,11 +95,19 @@ export function TokenBalances() {
   }
 
   const handleUnstake = async () => {
-    if (!isConnected || !account) return
+    if (!isConnected || !account || !isCorrectNetwork) {
+      alert("Please connect to the BlockDAG network")
+      return
+    }
+
+    const tokenContract = getContract("TOKEN")
+    if (!tokenContract) {
+      alert("Token contract not available")
+      return
+    }
 
     setIsUnstaking(true)
     try {
-      const tokenContract = getContract("TOKEN")
       const tx = await tokenContract.unstakeBDAG()
       await tx.wait()
       
@@ -151,6 +165,38 @@ export function TokenBalances() {
     return Date.now() / 1000 >= tokenData.unlockTime
   }
 
+  if (!isConnected) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        {[1, 2, 3].map((i) => (
+          <Card key={i}>
+            <CardContent className="pt-6">
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">Connect wallet to view balances</p>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    )
+  }
+
+  if (!isCorrectNetwork) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        {[1, 2, 3].map((i) => (
+          <Card key={i}>
+            <CardContent className="pt-6">
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">Connect to BlockDAG network</p>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    )
+  }
+
   if (isLoading) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -179,7 +225,7 @@ export function TokenBalances() {
             size="sm" 
             className="mt-3 w-full bg-climate-green hover:bg-climate-green/90"
             onClick={handleTransfer}
-            disabled={isTransferring}
+            disabled={isTransferring || !isCorrectNetwork}
           >
             {isTransferring ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
             Transfer
@@ -212,7 +258,7 @@ export function TokenBalances() {
             variant="outline" 
             className="mt-3 w-full bg-transparent"
             onClick={handleUnstake}
-            disabled={isUnstaking || !isStakeUnlocked() || parseFloat(tokenData.bdagStaked) === 0}
+            disabled={isUnstaking || !isStakeUnlocked() || parseFloat(tokenData.bdagStaked) === 0 || !isCorrectNetwork}
           >
             {isUnstaking ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
             {isStakeUnlocked() ? "Unstake" : `Locked for ${getDaysLeft()} days`}
@@ -232,7 +278,7 @@ export function TokenBalances() {
             size="sm" 
             className="mt-3 w-full bg-amber-500 hover:bg-amber-600"
             onClick={handleClaim}
-            disabled={isClaiming || parseFloat(tokenData.pendingRewards) === 0}
+            disabled={isClaiming || parseFloat(tokenData.pendingRewards) === 0 || !isCorrectNetwork}
           >
             {isClaiming ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
             Claim

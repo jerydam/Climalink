@@ -48,6 +48,12 @@ export function StatsCards() {
         const tokenContract = getContract("TOKEN")
         const climateContract = getContract("CLIMATE")
 
+        if (!tokenContract || !climateContract) {
+          console.error("Contracts not available")
+          setIsLoading(false)
+          return
+        }
+
         // Fetch CLT balance and staking info
         const [cltBalance, bdagStaked, unlockTime, isEligibleForMinting] = await Promise.all([
           tokenContract.balanceOf(account),
@@ -74,9 +80,9 @@ export function StatsCards() {
         let totalEarned = 0
 
         try {
-          // More efficient approach: use events instead of iterating through all reports
+          // Use correct event name and method
           const reportEvents = await climateContract.queryFilter(
-            climateContract.filters.ClimateEvent(),
+            climateContract.filters.ReportCreated(null, account),
             fromBlock,
             currentBlock
           )
@@ -84,15 +90,13 @@ export function StatsCards() {
           // Check which reports belong to this user
           for (const event of reportEvents) {
             try {
-              const reportIndex = event.args?.[0]
-              if (reportIndex) {
-                const report = await climateContract.getClimateReport(reportIndex)
-                if (report.reporter.toLowerCase() === account.toLowerCase()) {
-                  userReportsSubmitted++
-                  if (report.status === 1) { // ReportStatus.Validated
-                    validUserReports++
-                    totalEarned += 20 // 20 CLT per validated report
-                  }
+              const reportId = event.args?.[0]
+              if (reportId) {
+                const report = await climateContract.getReport(reportId)
+                userReportsSubmitted++
+                if (report.status === 1) { // ReportStatus.Valid
+                  validUserReports++
+                  totalEarned += 20 // 20 CLT per validated report
                 }
               }
             } catch (error) {
@@ -109,7 +113,7 @@ export function StatsCards() {
             
             for (let i = Math.max(1, Number(reportCount) - maxCheck + 1); i <= Number(reportCount); i++) {
               try {
-                const report = await climateContract.getClimateReport(i)
+                const report = await climateContract.getReport(i)
                 if (report.reporter.toLowerCase() === account.toLowerCase()) {
                   userReportsSubmitted++
                   if (report.status === 1) {
