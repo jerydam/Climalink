@@ -172,7 +172,7 @@ function QuickStakeActions() {
               <span className="text-sky-900">Stake BDAG Tokens</span>
             </div>
             {stakingInfo.isStakeActive && (
-              <Badge className="bg-climate-green/10 text-climate-green border-climate-green">
+              <Badge className="bg-green-600/10 text-green-600 border-green-600">
                 Currently Staked
               </Badge>
             )}
@@ -190,7 +190,7 @@ function QuickStakeActions() {
             </div>
             <div className="text-center">
               <p className="text-sm text-muted-foreground">Instant Reward</p>
-              <p className="text-xl font-bold text-climate-green">{stakingInfo.autoMintAmount} CLT</p>
+              <p className="text-xl font-bold text-green-600">{stakingInfo.autoMintAmount} CLT</p>
             </div>
           </div>
 
@@ -207,7 +207,7 @@ function QuickStakeActions() {
           <div className="space-y-3">
             {!stakingInfo.hasApproval && canStake() ? (
               <Button 
-                className="w-full bg-orange-500 hover:bg-orange-600 text-white"
+                className="w-full flex-1 bg-green-600 hover:bg-green-700/90 text-white"
                 size="lg"
                 onClick={() => setShowApprovalModal(true)}
                 disabled={isProcessing || !isCorrectNetwork}
@@ -251,7 +251,7 @@ function QuickStakeActions() {
               </div>
             ) : (
               <div className="text-center py-4">
-                <p className="text-climate-green font-medium">
+                <p className="text-green-600 font-medium">
                   ✓ You're already staking! Check the dashboard below for details.
                 </p>
               </div>
@@ -263,7 +263,7 @@ function QuickStakeActions() {
             <h4 className="font-medium text-sky-900 mb-2">Staking Benefits</h4>
             <div className="grid grid-cols-2 gap-2 text-sm">
               <div className="flex items-center gap-2">
-                <Coins className="h-3 w-3 text-climate-green" />
+                <Coins className="h-3 w-3 text-green-600" />
                 <span>Instant CLT rewards</span>
               </div>
               <div className="flex items-center gap-2">
@@ -324,7 +324,7 @@ function AccessDenied() {
               <div className="grid gap-4">
                 <Button 
                   onClick={joinAsReporter} 
-                  className="bg-climate-green hover:bg-climate-green/90"
+                  className="flex-1 bg-green-600 hover:bg-green-700/90"
                 >
                   <UserPlus className="h-4 w-4 mr-2" />
                   Join as Reporter
@@ -401,7 +401,7 @@ export default function PortfolioPage() {
       
       <main className="container mx-auto px-4 py-8 pb-20 md:pb-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-climate-green mb-2">
+          <h1 className="text-3xl font-bold text-green-600 mb-2">
             Portfolio {userRole === "dao_member" && "(DAO Member)"}
           </h1>
           <p className="text-muted-foreground">

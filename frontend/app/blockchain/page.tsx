@@ -151,13 +151,13 @@ export default function BlockchainPage() {
 
   const getNetworkStatusColor = () => {
     if (!isConnected) return "bg-gray-500"
-    if (networkInfo.isMainnet) return "bg-climate-green"
+    if (networkInfo.isMainnet) return "bg-green-600"
     return "bg-amber-500"
   }
 
   const getGasPriceColor = () => {
     const gasPrice = parseFloat(networkInfo.gasPrice)
-    if (gasPrice < 20) return "text-climate-green"
+    if (gasPrice < 20) return "text-green-600"
     if (gasPrice < 50) return "text-amber-500"
     return "text-red-500"
   }
@@ -168,7 +168,7 @@ export default function BlockchainPage() {
         <MainNav />
         <main className="container mx-auto px-4 py-8">
           <div className="max-w-2xl mx-auto text-center">
-            <h1 className="text-3xl font-bold text-climate-green mb-4">Blockchain Integration</h1>
+            <h1 className="text-3xl font-bold text-green-600 mb-4">Blockchain Integration</h1>
             <p className="text-muted-foreground mb-8">
               Connect your wallet to access blockchain features and interact with ClimaLink smart contracts
             </p>
@@ -186,7 +186,7 @@ export default function BlockchainPage() {
       <main className="container mx-auto px-4 py-8 pb-20 md:pb-8">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-climate-green mb-2">Blockchain Integration</h1>
+            <h1 className="text-3xl font-bold text-green-600 mb-2">Blockchain Integration</h1>
             <p className="text-muted-foreground">
               Connect your wallet and interact with ClimaLink smart contracts
             </p>
@@ -229,7 +229,7 @@ export default function BlockchainPage() {
                   </div>
                   <Badge 
                     variant={isConnected ? "default" : "secondary"} 
-                    className={isConnected ? "bg-climate-green" : ""}
+                    className={isConnected ? "bg-green-600" : ""}
                   >
                     {isConnected ? "Active" : "Inactive"}
                   </Badge>

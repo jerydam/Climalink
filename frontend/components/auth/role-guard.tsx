@@ -358,7 +358,7 @@ function JoinPrompt({ currentPage }: { currentPage?: string }) {
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-climate-green mb-4">{title}</h1>
+            <h1 className="text-3xl font-bold text-green-600 mb-4">{title}</h1>
             <p className="text-muted-foreground">{suggestion}</p>
           </div>
 
@@ -366,7 +366,7 @@ function JoinPrompt({ currentPage }: { currentPage?: string }) {
             <Card className="hover:shadow-lg transition-shadow">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <FileText className="h-5 w-5 text-climate-green" />
+                  <FileText className="h-5 w-5 text-green-600" />
                   Reporter (Free)
                 </CardTitle>
               </CardHeader>
@@ -417,7 +417,7 @@ function JoinPrompt({ currentPage }: { currentPage?: string }) {
             <Card className="hover:shadow-lg transition-shadow">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5 text-climate-green" />
+                  <Users className="h-5 w-5 text-green-600" />
                   DAO Member
                 </CardTitle>
               </CardHeader>

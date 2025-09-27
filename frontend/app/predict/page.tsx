@@ -24,10 +24,25 @@ export default function Page() {
         const weatherRes = await fetch(
           `/api/weather?latitude=${lat}&longitude=${lon}`
         );
+        
+        if (!weatherRes.ok) {
+          console.warn("Weather API returned error:", weatherRes.status);
+          setWeather(null);
+          return;
+        }
+        
         const weatherData = await weatherRes.json();
+        
+        // Check if the response has the expected structure
+        if (weatherData.error) {
+          console.warn("Weather API error:", weatherData.error);
+          setWeather(null);
+          return;
+        }
+        
         setWeather(weatherData);
-      } catch {
-        console.warn("Weather API not available");
+      } catch (weatherError) {
+        console.warn("Weather API not available:", weatherError);
         setWeather(null);
       }
     } catch (err: any) {
@@ -77,7 +92,7 @@ export default function Page() {
             )}
 
             {/* Daily Forecast */}
-            {weather.forecast.forecast && (
+            {weather.forecast?.forecast && (
               <div>
                 <h2 className="text-xl font-bold mb-4">📅 Daily Forecast</h2>
                 {Object.entries(
@@ -108,7 +123,7 @@ export default function Page() {
             )}
 
             {/* Hourly Timeline */}
-            {weather.forecast && (
+            {weather.forecast?.forecast && (
               <div>
                 <h2 className="text-xl font-bold mb-4">⏰ Hourly Timeline</h2>
                 <div className="flex space-x-4 overflow-x-auto pb-2">

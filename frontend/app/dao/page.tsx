@@ -174,11 +174,7 @@ function DAOJoinSection({ eligibility }: { eligibility: DAOEligibility }) {
                 <XCircle className="h-4 w-4 text-red-500 mx-auto mt-1" />
               )}
             </div>
-            <div className="text-center">
-              <p className="text-sm text-muted-foreground">Membership Fee</p>
-              <p className="text-lg font-bold">{eligibility.requiredCLT} CLT</p>
-              <Coins className="h-4 w-4 text-purple-500 mx-auto mt-1" />
-            </div>
+
           </div>
 
           {/* Requirements Check */}
@@ -229,7 +225,7 @@ function DAOJoinSection({ eligibility }: { eligibility: DAOEligibility }) {
                 size="lg"
               >
                 <Users className="h-4 w-4 mr-2" />
-                Join DAO (Pay {eligibility.requiredCLT} CLT Fee)
+                Join DAO  
               </Button>
             </div>
           ) : (
@@ -287,7 +283,7 @@ function DAOJoinSection({ eligibility }: { eligibility: DAOEligibility }) {
           isOpen={showJoinModal}
           onClose={() => setShowJoinModal(false)}
           title="Join DAO"
-          description={`Pay ${eligibility.requiredCLT} CLT tokens to join the DAO. You'll gain voting rights, proposal creation, and governance participation.`}
+          description={`Join the DAO, gain voting rights, proposal creation, and governance participation.`}
           onConfirm={handleJoinDAO}
           requiresApproval={true}
           approvalAmount={eligibility.requiredCLT}

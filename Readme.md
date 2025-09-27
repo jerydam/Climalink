@@ -2,7 +2,8 @@
 
 **A blockchain-based platform for community-driven climate data collection, validation, and governance.**
 
-ClimaLink empowers users to submit real-time weather reports, validate community-submitted data, and participate in decentralized autonomous organization (DAO) governance, earning CLT (ClimaLink Token) rewards. Built on blockchain technology, ClimaLink ensures transparency, incentivizes accurate reporting, and fosters community-driven climate data integrity.
+ClimaLink empowers users to submit real-time weather reports, view forecasts (present and future), validate community-submitted data, and participate in decentralized autonomous organization (DAO) governance, earning CLT (ClimaLink Token) rewards. Built on blockchain technology, ClimaLink ensures transparency, incentivizes accurate reporting, and fosters community-driven climate data integrity.  Submitted data is stored on-chain, and as accumulation rises, it will power future ML-based weather prediction.
+
 
 ## Hackathon Submission Overview
 
@@ -42,11 +43,14 @@ ClimaLink empowers users to submit real-time weather reports, validate community
 
 ## Overview
 
-ClimaLink is a decentralized platform that leverages blockchain technology to crowdsource accurate climate data globally. Users submit weather reports, validators verify data accuracy, and a DAO governs platform operations. The platform uses CLT tokens for rewards and BDAG token staking for membership, ensuring economic incentives and trustless operation.
+ClimaLink is a decentralized platform that incentivizes accurate climate reporting and forecasting through blockchain technology. Users earn CLT (ClimaLink Token) rewards by submitting climate data, viewing and validating weather reports and forecasts, and participating in platform governance. Accumulated data will serve as the backbone for custom ML models powering decentralized, API-independent weather predictions.
 
 ### Key Benefits
 - **Decentralized Data Collection**: Global community-driven weather reporting.
 - **Data Integrity**: Multi-validator consensus ensures reliable data.
+- **Forecast Page**: View both present and future weather conditions for any location
+- **Predictive Pathway**: User data directly powers future ML-based prediction capabilities
+- **Quality Assurance**: Multi-validator voting for accuracy
 - **Incentivized Participation**: Earn 20 CLT tokens per validated report.
 - **Transparent Governance**: DAO-based decision-making with 51% quorum.
 - **Immutable Records**: Blockchain ensures tamper-proof data and transactions.
@@ -58,6 +62,8 @@ ClimaLink is a decentralized platform that leverages blockchain technology to cr
 
 ### Core Functionality
 - **Weather Report Submission**: Submit real-time weather data with GPS coordinates.
+- **Interactive Forecast Page**: View global and local weather conditions, instantly updated as reports are submitted.
+- **Data Accumulation for ML**: All user reports are stored with the aim of powering proprietary ML-based weather prediction in the future
 - **Community Validation**: 24-hour validator voting ensures data accuracy.
 - **Interactive Climate Map**: Visualize global climate data in real-time.
 - **Token Rewards**: Earn 20 CLT tokens for validated reports.
@@ -89,6 +95,7 @@ ClimaLink is a decentralized platform that leverages blockchain technology to cr
 - **Express.js**: Framework for building RESTful APIs.
 - **Weather APIs**: Integration with external weather services (e.g., OpenWeatherMap).
 - **MongoDB**: Database for caching API responses and user metadata.
+- **Future**: TensorFlow/PyTorch for ML
 
 ### Blockchain Integration
 - **Ethers.js v6**: Ethereum blockchain interaction library.
@@ -336,6 +343,9 @@ climalink/
    - Location description (max 100 chars).
 3. Submit to blockchain via `createReport`.
 4. Await 24-hour validation; earn 20 CLT if validated.
+5. View current and predicted weather on the "Forecast" page (based on both community-supplied and external API data)
+
+All user submissions stored on-chain for use in ML model development
 
 ### Validating Reports
 1. Access `validate/` page (Validator role required).
@@ -346,7 +356,7 @@ climalink/
 
 ### DAO Participation
 1. Stake 100 BDAG and maintain 1000 CLT.
-2. Pay 1000 CLT to join DAO via `joinDao`.
+2. Join DAO via `joinDao`.
 3. Create or vote on proposals via `createProposal` and `vote`.
 4. Proposals execute with 51% quorum after 1-hour delay.
 
@@ -418,10 +428,10 @@ climalink/
 ---
 
 ## Roadmap
-- **Phase 1 (Current)**: Core reporting, validation, DAO, and token system.
+- **Phase 1 (Current)**: Core reporting, forecast page (present and future), validation, DAO, and token system.
 - **Phase 2 (Q1 2026)**: Mobile app, analytics dashboard, API integrations.
-- **Phase 3 (Q2 2026)**: ML validation, NFT achievements, climate fund.
-- **Phase 4 (Q4 2026)**: Cross-chain support, prediction algorithms, carbon credits.
+- **Phase 3 (Q2 2026)**: Proprietary ML model research; begin using on-chain user data for training. Beta test decentralized ML-powered forecasts, NFT achievements, climate fund.
+- **Phase 4 (Q4 2026)**: Full transition to on-chain, community-trained ML weather prediction. Launch decentralized predictive API for partners/enterprises.
 
 ---
 
@@ -451,3 +461,5 @@ MIT License - see [LICENSE](LICENSE) file.
 ---
 
 **Disclaimer**: ClimaLink is experimental and involves financial risks. BDAG tokens are locked for 60 days upon staking. Verify weather data from multiple sources for critical decisions. Participate responsibly.
+
+As ClimaLink moves toward decentralized AI prediction, always verify forecasts for critical activities, especially during the transition period.

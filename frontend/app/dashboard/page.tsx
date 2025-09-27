@@ -65,7 +65,7 @@ function WelcomeNewUser() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
               {/* Reporter Option */}
-              <Card className="border-green-300 bg-gradient-to-r from-climate-green/10 to-emerald-50">
+              <Card className="border-green-300 bg-gradient-to-r from-green-600/10 to-emerald-50">
                 <CardContent className="p-6">
                   <div className="text-center">
                     <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -349,7 +349,7 @@ export default function DashboardPage() {
                   <div>
                     <h3 className="font-semibold text-amber-800 mb-1">Join the DAO</h3>
                     <p className="text-sm text-amber-700 mb-2">
-                      Unlock governance participation and create proposals! Requires {debugInfo.membershipFee} CLT membership fee.
+                      Unlock governance participation and create proposals!
                     </p>
                     <p className="text-xs text-amber-600">
                       Current CLT balance: {parseFloat(debugInfo.cltBalance).toFixed(2)} CLT

@@ -13,7 +13,7 @@ import { ArrowLeftIcon } from "@heroicons/react/24/outline"
 import { useRole } from "@/lib/roles"
 import { useWeb3 } from "@/lib/web3"
 import { Card, CardContent } from "@/components/ui/card"
-import { Loader2, UserPlus, ShieldCheck } from "lucide-react"
+import { Loader2, UserPlus, ShieldCheck, MapPin, CloudSun, AlertTriangle, Users } from "lucide-react"
 
 interface WeatherData {
   temperature: number
@@ -21,6 +21,21 @@ interface WeatherData {
   weather: string
   notes: string
   photo?: File
+}
+
+interface FetchedWeatherData {
+  current?: {
+    temperature: number
+    humidity: number
+    weatherCondition: string
+  }
+  forecast?: {
+    forecast: Array<{
+      timestamp: string
+      temperature: number
+      weatherCondition: string
+    }>
+  }
 }
 
 function AccessDenied() {
@@ -44,7 +59,7 @@ function AccessDenied() {
               <div className="grid gap-4">
                 <Button 
                   onClick={joinAsReporter} 
-                  className="bg-climate-green hover:bg-climate-green/90"
+                  className="bg-green-600 hover:bg-green-600/90"
                 >
                   <UserPlus className="h-4 w-4 mr-2" />
                   Join as Reporter
@@ -94,6 +109,10 @@ export default function SubmitReportPage() {
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showTransactionModal, setShowTransactionModal] = useState(false)
+  const [isFetchingWeather, setIsFetchingWeather] = useState(false)
+  const [weatherFetchError, setWeatherFetchError] = useState<string | null>(null)
+  const [isUsingCurrentLocation, setIsUsingCurrentLocation] = useState(false)
+  const [validatorError, setValidatorError] = useState<string | null>(null)
 
   const { isConnected, getContract } = useWeb3()
   const { userRole, isLoading, isMember } = useRole()
@@ -108,6 +127,100 @@ export default function SubmitReportPage() {
   const handleLocationChange = (newLocation: string, newCoordinates: { lat: number; lng: number }) => {
     setLocation(newLocation)
     setCoordinates(newCoordinates)
+  }
+
+  // Function to get user's current location and fetch weather
+  const handleUseCurrentLocation = async () => {
+    setIsUsingCurrentLocation(true)
+    setIsFetchingWeather(true)
+    setWeatherFetchError(null)
+
+    try {
+      // Get user's current position
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        if (!navigator.geolocation) {
+          reject(new Error("Geolocation is not supported by this browser"))
+          return
+        }
+
+        navigator.geolocation.getCurrentPosition(
+          resolve,
+          reject,
+          { 
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 60000 
+          }
+        )
+      })
+
+      const lat = position.coords.latitude
+      const lng = position.coords.longitude
+
+      // Update coordinates
+      setCoordinates({ lat, lng })
+
+      // Reverse geocode to get location name
+      try {
+        const geoRes = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`
+        )
+        const geoData = await geoRes.json()
+        
+        const locationName = geoData.display_name || 
+          `${geoData.address?.road || "Unknown road"}, ${
+            geoData.address?.city ||
+            geoData.address?.town ||
+            geoData.address?.village ||
+            "Unknown place"
+          }`
+        
+        setLocation(locationName)
+      } catch (error) {
+        console.warn("Failed to reverse geocode:", error)
+        setLocation(`Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`)
+      }
+
+      // Fetch weather data
+      try {
+        const weatherRes = await fetch(`/api/weather?latitude=${lat}&longitude=${lng}`)
+        
+        if (!weatherRes.ok) {
+          throw new Error(`Weather API returned ${weatherRes.status}`)
+        }
+
+        const fetchedWeather: FetchedWeatherData = await weatherRes.json()
+        
+        // Update weather data with fetched information
+        if (fetchedWeather.current) {
+          setWeatherData(prev => ({
+            ...prev,
+            temperature: fetchedWeather.current!.temperature,
+            humidity: fetchedWeather.current!.humidity,
+            weather: fetchedWeather.current!.weatherCondition.toLowerCase(),
+            notes: `Automatically fetched from current location at ${new Date().toLocaleString()}`
+          }))
+        } else {
+          throw new Error("No current weather data available")
+        }
+
+      } catch (weatherError) {
+        console.warn("Weather fetch failed:", weatherError)
+        setWeatherFetchError("Weather data not available, please enter manually")
+        // Keep the coordinates and location, but don't update weather data
+      }
+
+    } catch (error) {
+      console.error("Failed to get current location:", error)
+      setWeatherFetchError(
+        error instanceof Error 
+          ? error.message 
+          : "Failed to get your current location"
+      )
+    } finally {
+      setIsFetchingWeather(false)
+      setIsUsingCurrentLocation(false)
+    }
   }
 
   const handleNext = () => {
@@ -143,7 +256,7 @@ export default function SubmitReportPage() {
       }
 
       // Submit the climate report
-      const tx = await climateContract.createClimateReport(reportInput)
+      const tx = await climateContract.createReport(reportInput)
       await tx.wait()
 
       // Success - redirect to dashboard
@@ -159,6 +272,12 @@ export default function SubmitReportPage() {
 
   const handleEdit = () => {
     setStep(2)
+  }
+
+  const handleJoinAsValidator = () => {
+    setValidatorError(null)
+    // Navigate to validator registration
+    router.push("/join?role=validator")
   }
 
   if (isLoading) {
@@ -190,7 +309,7 @@ export default function SubmitReportPage() {
 
           {/* Progress Indicator */}
           <div className="flex items-center space-x-4">
-            {[1, 2, 3].map((stepNumber) => (
+            {[1, 2, 3].map((stepNumber) => (~
               <div key={stepNumber} className="flex items-center">
                 <div
                   className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
@@ -206,10 +325,97 @@ export default function SubmitReportPage() {
             ))}
           </div>
 
+          {/* Error Display */}
+          {weatherFetchError && (
+            <Card className="border-orange-200 bg-orange-50">
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-2">
+                  <CloudSun className="h-4 w-4 text-orange-600" />
+                  <p className="text-sm text-orange-800">{weatherFetchError}</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Validator Error Display */}
+          {validatorError && (
+            <Card className="border-red-200 bg-red-50">
+              <CardContent className="p-6">
+                <div className="flex items-start space-x-3">
+                  <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5" />
+                  <div className="flex-1">
+                    <h3 className="font-medium text-red-900 mb-2">Network Needs More Validators</h3>
+                    <p className="text-sm text-red-800 mb-4">{validatorError}</p>
+                    
+                    <div className="grid gap-2">
+                      <Button 
+                        onClick={handleJoinAsValidator}
+                        size="sm"
+                        className="bg-red-600 hover:bg-red-700 text-white"
+                      >
+                        <Users className="h-4 w-4 mr-2" />
+                        Become a Validator
+                      </Button>
+                      
+                      <Button 
+                        onClick={() => setValidatorError(null)}
+                        variant="outline"
+                        size="sm"
+                        className="border-red-300 text-red-700"
+                      >
+                        Try Again Later
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Step Content */}
           {step === 1 && (
             <div className="space-y-6">
-              <LocationInput location={location} coordinates={coordinates} onLocationChange={handleLocationChange} />
+              <LocationInput 
+                location={location} 
+                coordinates={coordinates} 
+                onLocationChange={handleLocationChange} 
+              />
+              
+              {/* Use Current Location Button */}
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex flex-col space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="font-medium">Use Current Location</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Automatically detect your location and fetch current weather data
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <Button 
+                      onClick={handleUseCurrentLocation}
+                      disabled={isFetchingWeather || isUsingCurrentLocation}
+                      variant="outline"
+                      className="w-full"
+                    >
+                      {isFetchingWeather ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          {isUsingCurrentLocation ? "Getting location..." : "Fetching weather..."}
+                        </>
+                      ) : (
+                        <>
+                          <MapPin className="h-4 w-4 mr-2" />
+                          Use Current Location & Weather
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
               <Button onClick={handleNext} className="w-full">
                 Next: Weather Data
               </Button>
@@ -253,4 +459,4 @@ export default function SubmitReportPage() {
       />
     </div>
   )
-}
+} 
