@@ -78,7 +78,7 @@ ClimaLink is a decentralized platform that leverages blockchain technology to cr
 ## Technology Stack
 
 ### Frontend
-- **Next.js 14**: React framework with App Router for dynamic UI.
+- **Next.js 15**: React framework with App Router for dynamic UI.
 - **TypeScript**: Type-safe development for robust code.
 - **Tailwind CSS**: Utility-first CSS for responsive design.
 - **shadcn/ui**: Modern, reusable UI components.
