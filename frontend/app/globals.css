@@ -17,6 +17,7 @@
 
   /* Updated to modern color palette with better contrast */
   --primary: oklch(0.42 0.18 142); /* Deep Climate Green */
+  --climate-green: oklch(62.7% 0.194 149.214);
   --primary-foreground: oklch(0.98 0 0);
   --secondary: oklch(0.52 0.22 258); /* Rich Sky Blue */
   --secondary-foreground: oklch(0.98 0 0);
@@ -75,6 +76,7 @@
   --popover-foreground: oklch(0.95 0 0);
 
   --primary: oklch(0.58 0.18 142);
+  --climate-green: oklch(62.7% 0.194 149.214);
   --primary-foreground: oklch(0.12 0 0);
   --secondary: oklch(0.68 0.22 258);
   --secondary-foreground: oklch(0.12 0 0);
@@ -116,6 +118,7 @@
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
+  --climate-green: var(--climate-green);
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
@@ -154,6 +157,9 @@
   --color-success-foreground: var(--success-foreground);
   --color-error: var(--error);
   --color-error-foreground: var(--error-foreground);
+
+  --color-climate-green: oklch(62.7% 0.194 149.214);
+
 }
 
 @layer base {

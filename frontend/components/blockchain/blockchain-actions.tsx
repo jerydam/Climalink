@@ -132,9 +132,9 @@ export function BlockchainActions() {
           </p>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="p-4 border rounded-lg bg-climate-green/5 border-climate-green/20">
+            <div className="p-4 border rounded-lg bg-green-600/5 border-green-600/20">
               <div className="flex items-center gap-2 mb-3">
-                <FileText className="h-5 w-5 text-climate-green" />
+                <FileText className="h-5 w-5 text-green-600" />
                 <h4 className="font-medium">Reporter (Free)</h4>
               </div>
               <ul className="text-sm text-muted-foreground mb-4 space-y-1">
@@ -145,7 +145,7 @@ export function BlockchainActions() {
               </ul>
               <Button 
                 onClick={() => setActiveModal("join-reporter")} 
-                className="w-full bg-climate-green hover:bg-climate-green/90"
+                className="w-full bg-green-600 hover:bg-green-600/90"
               >
                 <UserPlus className="h-4 w-4 mr-2" />
                 Join Free & Start Earning
@@ -194,7 +194,7 @@ export function BlockchainActions() {
           {/* All members can submit reports */}
           <Button 
             onClick={() => setActiveModal("submit")} 
-            className="bg-climate-green hover:bg-climate-green/90"
+            className="bg-green-600 hover:bg-green-600/90"
           >
             <FileText className="h-4 w-4 mr-2" />
             Submit Report
@@ -229,8 +229,8 @@ export function BlockchainActions() {
 
       {/* Earning Information */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="p-4 bg-climate-green/5 border border-climate-green/20 rounded-lg">
-          <h4 className="font-medium text-climate-green mb-2">Reporter Earnings</h4>
+        <div className="p-4 bg-green-600/5 border border-green-600/20 rounded-lg">
+          <h4 className="font-medium text-green-600 mb-2">Reporter Earnings</h4>
           <ul className="text-sm space-y-1">
             <li>• 20 CLT per validated report</li>
             <li>• Immediate payout when validated</li>

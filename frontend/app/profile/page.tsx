@@ -34,7 +34,7 @@ function AccessDenied() {
               <div className="grid gap-4">
                 <Button 
                   onClick={joinAsReporter} 
-                  className="bg-climate-green hover:bg-climate-green/90"
+                  className="bg-green-600 hover:bg-green-600/90"
                 >
                   <UserPlus className="h-4 w-4 mr-2" />
                   Join as Reporter
@@ -111,7 +111,7 @@ export default function ProfilePage() {
       
       <main className="container mx-auto px-4 py-8 pb-20 md:pb-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-climate-green mb-2">
+          <h1 className="text-3xl font-bold text-green-600 mb-2">
             Profile {userRole === "dao_member" ? "(DAO Member)" : userRole === "validator" ? "(Validator)" : userRole === "reporter" ? "(Reporter)" : ""}
           </h1>
           <p className="text-muted-foreground">
