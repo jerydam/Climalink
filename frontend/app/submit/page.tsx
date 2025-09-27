@@ -38,6 +38,65 @@ interface FetchedWeatherData {
   }
 }
 
+// Temperature validation constants (in Fahrenheit)
+const TEMP_MIN = -58 // Minimum temperature in Fahrenheit (-50°C)
+const TEMP_MAX = 140 // Maximum temperature in Fahrenheit (60°C)
+const TEMP_PRECISION = 100 // Multiply by 100 for contract storage
+
+// Validation functions
+const validateTemperature = (temp: number): boolean => {
+  if (isNaN(temp)) return false
+  return temp >= TEMP_MIN && temp <= TEMP_MAX
+}
+
+const validateHumidity = (humidity: number): boolean => {
+  if (isNaN(humidity)) return false
+  return humidity >= 0 && humidity <= 100
+}
+
+const validateCoordinates = (lat: number, lng: number): boolean => {
+  return lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180
+}
+
+// Convert Celsius to Fahrenheit and prepare for blockchain
+const safeTemperatureConversion = (tempCelsius: number): number => {
+  if (!validateTemperature((tempCelsius * 9/5) + 32)) {
+    throw new Error(`Temperature must be between ${TEMP_MIN}°F and ${TEMP_MAX}°F`)
+  }
+  
+  // Convert Celsius to Fahrenheit
+  const tempFahrenheit = (tempCelsius * 9/5) + 32
+  const converted = Math.round(tempFahrenheit * TEMP_PRECISION)
+  
+  // Ensure the converted value is non-negative (for uint)
+  if (converted < 0) {
+    throw new Error("Temperature conversion resulted in a negative value, which is not supported by the contract")
+  }
+  
+  // Check for uint128 range
+  const MAX_UINT128 = BigInt(2) ** BigInt(128) - BigInt(1)
+  
+  if (BigInt(converted) > MAX_UINT128) {
+    throw new Error("Temperature conversion exceeds maximum uint128 range")
+  }
+  
+  return converted
+}
+
+const safeCoordinateConversion = (coord: number): number => {
+  const converted = Math.round(coord * 1000000)
+  
+  // Check for safe integer range
+  const MAX_INT128 = BigInt(2) ** BigInt(127) - BigInt(1)
+  const MIN_INT128 = -(BigInt(2) ** BigInt(127))
+  
+  if (BigInt(converted) > MAX_INT128 || BigInt(converted) < MIN_INT128) {
+    throw new Error("Coordinate conversion out of safe integer range")
+  }
+  
+  return converted
+}
+
 function AccessDenied() {
   const { joinAsReporter, joinAsValidator } = useRole()
 
@@ -70,7 +129,7 @@ function AccessDenied() {
                   variant="outline"
                 >
                   <ShieldCheck className="h-4 w-4 mr-2" />
-                  Join as Reporter
+                  Join as Validator
                 </Button>
               </div>
             </CardContent>
@@ -102,7 +161,7 @@ export default function SubmitReportPage() {
   const [location, setLocation] = useState("Miami, Florida, USA")
   const [coordinates, setCoordinates] = useState({ lat: 25.7617, lng: -80.1918 })
   const [weatherData, setWeatherData] = useState<WeatherData>({
-    temperature: 25,
+    temperature: 25, // Stored as Celsius, will be converted to Fahrenheit
     humidity: 65,
     weather: "sunny",
     notes: "",
@@ -113,6 +172,7 @@ export default function SubmitReportPage() {
   const [weatherFetchError, setWeatherFetchError] = useState<string | null>(null)
   const [isUsingCurrentLocation, setIsUsingCurrentLocation] = useState(false)
   const [validatorError, setValidatorError] = useState<string | null>(null)
+  const [validationErrors, setValidationErrors] = useState<string[]>([])
 
   const { isConnected, getContract } = useWeb3()
   const { userRole, isLoading, isMember } = useRole()
@@ -124,9 +184,38 @@ export default function SubmitReportPage() {
     }
   }, [isConnected, router])
 
+  // Validate all form data
+  const validateFormData = (): string[] => {
+    const errors: string[] = []
+
+    const tempFahrenheit = (weatherData.temperature * 9/5) + 32
+    if (!validateTemperature(tempFahrenheit)) {
+      errors.push(`Temperature must be between ${TEMP_MIN}°F and ${TEMP_MAX}°F`)
+    }
+
+    if (!validateHumidity(weatherData.humidity)) {
+      errors.push("Humidity must be between 0% and 100%")
+    }
+
+    if (!validateCoordinates(coordinates.lat, coordinates.lng)) {
+      errors.push("Invalid coordinates")
+    }
+
+    if (!weatherData.weather || weatherData.weather.trim().length === 0) {
+      errors.push("Weather condition is required")
+    }
+
+    if (!location || location.trim().length === 0) {
+      errors.push("Location is required")
+    }
+
+    return errors
+  }
+
   const handleLocationChange = (newLocation: string, newCoordinates: { lat: number; lng: number }) => {
     setLocation(newLocation)
     setCoordinates(newCoordinates)
+    setValidationErrors([]) // Clear validation errors when location changes
   }
 
   // Function to get user's current location and fetch weather
@@ -156,6 +245,11 @@ export default function SubmitReportPage() {
 
       const lat = position.coords.latitude
       const lng = position.coords.longitude
+
+      // Validate coordinates
+      if (!validateCoordinates(lat, lng)) {
+        throw new Error("Invalid coordinates received from geolocation")
+      }
 
       // Update coordinates
       setCoordinates({ lat, lng })
@@ -193,10 +287,23 @@ export default function SubmitReportPage() {
         
         // Update weather data with fetched information
         if (fetchedWeather.current) {
+          const tempCelsius = fetchedWeather.current.temperature
+          const tempFahrenheit = (tempCelsius * 9/5) + 32
+          const humidity = fetchedWeather.current.humidity
+          
+          // Validate fetched weather data
+          if (!validateTemperature(tempFahrenheit)) {
+            throw new Error(`Invalid temperature received: ${tempFahrenheit}°F`)
+          }
+          
+          if (!validateHumidity(humidity)) {
+            throw new Error(`Invalid humidity received: ${humidity}%`)
+          }
+          
           setWeatherData(prev => ({
             ...prev,
-            temperature: fetchedWeather.current!.temperature,
-            humidity: fetchedWeather.current!.humidity,
+            temperature: tempCelsius, // Store as Celsius for consistency
+            humidity: humidity,
             weather: fetchedWeather.current!.weatherCondition.toLowerCase(),
             notes: `Automatically fetched from current location at ${new Date().toLocaleString()}`
           }))
@@ -224,18 +331,35 @@ export default function SubmitReportPage() {
   }
 
   const handleNext = () => {
+    // Validate data before proceeding to next step
+    const errors = validateFormData()
+    if (errors.length > 0) {
+      setValidationErrors(errors)
+      return
+    }
+    
+    setValidationErrors([])
     if (step < 3) {
       setStep(step + 1)
     }
   }
 
   const handleBack = () => {
+    setValidationErrors([]) // Clear errors when going back
     if (step > 1) {
       setStep(step - 1)
     }
   }
 
   const handleSubmit = () => {
+    // Final validation before submission
+    const errors = validateFormData()
+    if (errors.length > 0) {
+      setValidationErrors(errors)
+      return
+    }
+    
+    setValidationErrors([])
     setShowTransactionModal(true)
   }
 
@@ -243,26 +367,80 @@ export default function SubmitReportPage() {
     setIsSubmitting(true)
     
     try {
+      // Final validation
+      const errors = validateFormData()
+      if (errors.length > 0) {
+        throw new Error(`Validation failed: ${errors.join(', ')}`)
+      }
+
       const climateContract = getContract("CLIMATE")
+      
+      // Safe conversion with detailed logging
+      let tempConverted: number
+      let latConverted: number
+      let lngConverted: number
+      
+      try {
+        tempConverted = safeTemperatureConversion(weatherData.temperature)
+        latConverted = safeCoordinateConversion(coordinates.lat)
+        lngConverted = safeCoordinateConversion(coordinates.lng)
+      } catch (conversionError) {
+        console.error("Conversion error:", conversionError)
+        throw new Error(`Data conversion failed: ${conversionError instanceof Error ? conversionError.message : 'Unknown error'}`)
+      }
       
       // Prepare report data
       const reportInput = {
-        weather: weatherData.weather,
-        temperature: Math.round(weatherData.temperature * 100), // Convert to int128 format
+        weather: weatherData.weather.trim(),
+        temperature: tempConverted,
+        humidity: Math.round(weatherData.humidity),
+        location: location.trim(),
+        longitude: lngConverted,
+        latitude: latConverted,
+      }
+
+      // Debug logging
+      console.log("Original data:", {
+        temperatureCelsius: weatherData.temperature,
+        temperatureFahrenheit: (weatherData.temperature * 9/5) + 32,
         humidity: weatherData.humidity,
+        coordinates: coordinates,
         location: location,
-        longitude: Math.round(coordinates.lng * 1000000), // Convert to int128 format
-        latitude: Math.round(coordinates.lat * 1000000), // Convert to int128 format
+        weather: weatherData.weather
+      })
+      
+      console.log("Converted data for contract:", reportInput)
+      
+      // Additional validation for contract compatibility
+      if (tempConverted < 0 || tempConverted > (TEMP_MAX * TEMP_PRECISION)) {
+        throw new Error(`Converted temperature ${tempConverted} is out of valid contract range (0 to ${TEMP_MAX * TEMP_PRECISION})`)
       }
 
       // Submit the climate report
       const tx = await climateContract.createReport(reportInput)
-      await tx.wait()
+      console.log("Transaction sent:", tx.hash)
+      
+      const receipt = await tx.wait()
+      console.log("Transaction confirmed:", receipt)
 
       // Success - redirect to dashboard
       router.push("/dashboard?success=report_submitted")
     } catch (error) {
       console.error("Error submitting report:", error)
+      
+      // Enhanced error handling
+      let errorMessage = "Failed to submit report"
+      if (error instanceof Error) {
+        if (error.message.includes("Invalid temperature")) {
+          errorMessage = "Temperature value is invalid for the contract. Please ensure the temperature is within the valid range (in Fahrenheit) and try again."
+        } else if (error.message.includes("execution reverted")) {
+          errorMessage = "Smart contract rejected the transaction. Please check your data and ensure the temperature is valid."
+        } else {
+          errorMessage = error.message
+        }
+      }
+      
+      setValidationErrors([errorMessage])
       throw error
     } finally {
       setIsSubmitting(false)
@@ -271,6 +449,7 @@ export default function SubmitReportPage() {
   }
 
   const handleEdit = () => {
+    setValidationErrors([]) // Clear errors when editing
     setStep(2)
   }
 
@@ -280,13 +459,14 @@ export default function SubmitReportPage() {
     router.push("/join?role=validator")
   }
 
+  const handleWeatherDataChange = (newData: WeatherData) => {
+    setWeatherData(newData)
+    setValidationErrors([]) // Clear validation errors when data changes
+  }
+
   if (isLoading) {
     return <LoadingPage />
   }
-
-  // if (!isMember || (userRole !== "reporter" && userRole !== "validator" && userRole !== "dao_member")) {
-  //   return <AccessDenied />
-  // }
 
   return (
     <div className="min-h-screen bg-background">
@@ -309,7 +489,7 @@ export default function SubmitReportPage() {
 
           {/* Progress Indicator */}
           <div className="flex items-center space-x-4">
-            {[1, 2, 3].map((stepNumber) => (~
+            {[1, 2, 3].map((stepNumber) => (
               <div key={stepNumber} className="flex items-center">
                 <div
                   className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
@@ -325,7 +505,26 @@ export default function SubmitReportPage() {
             ))}
           </div>
 
-          {/* Error Display */}
+          {/* Validation Errors */}
+          {validationErrors.length > 0 && (
+            <Card className="border-red-200 bg-red-50">
+              <CardContent className="p-4">
+                <div className="flex items-start space-x-2">
+                  <AlertTriangle className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <h3 className="font-medium text-red-900 mb-2">Please fix the following issues:</h3>
+                    <ul className="list-disc list-inside space-y-1">
+                      {validationErrors.map((error, index) => (
+                        <li key={index} className="text-sm text-red-800">{error}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Weather Fetch Error Display */}
           {weatherFetchError && (
             <Card className="border-orange-200 bg-orange-50">
               <CardContent className="p-4">
@@ -424,7 +623,13 @@ export default function SubmitReportPage() {
 
           {step === 2 && (
             <div className="space-y-6">
-              <WeatherForm data={weatherData} onDataChange={setWeatherData} />
+              <WeatherForm 
+                data={weatherData} 
+                onDataChange={handleWeatherDataChange}
+                tempMin={TEMP_MIN}
+                tempMax={TEMP_MAX}
+                tempUnit="°F"
+              />
               <Button onClick={handleNext} className="w-full">
                 Next: Review & Submit
               </Button>
@@ -435,13 +640,14 @@ export default function SubmitReportPage() {
             <SubmissionSummary
               location={location}
               coordinates={coordinates}
-              temperature={weatherData.temperature}
+              temperature={(weatherData.temperature * 9/5) + 32} // Display in Fahrenheit
               humidity={weatherData.humidity}
               weather={weatherData.weather}
               notes={weatherData.notes}
               photo={weatherData.photo}
               onSubmit={handleSubmit}
               onEdit={handleEdit}
+              tempUnit="°F"
             />
           )}
         </div>
@@ -456,7 +662,8 @@ export default function SubmitReportPage() {
         title="Submit Climate Report"
         description="This will submit your weather report to the blockchain and make it available for community validation."
         onConfirm={handleConfirmTransaction}
+        isLoading={isSubmitting}
       />
     </div>
   )
-} 
+}

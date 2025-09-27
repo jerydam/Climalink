@@ -1,7 +1,7 @@
 	// Smart Contract ABIs and addresses for ClimaLink
 	export const CONTRACTS = {
 	TOKEN: {
-		address: "0xa85240228AF43baaf245b49089919d6369901cc8",
+		address: "0xfec48f1C2ea14e38cA56110b30598183563D252f",
 		abi: [
 		{
 			"inputs": [
@@ -803,7 +803,7 @@
 	],
 	},
 	DAO: {
-		address: "0x374E861Aae6ac544c492e33aD67e5F4BB59A29b6",
+		address: "0x4Ba3437C60D83D4F8DCA2E62276c57ad6A2951b9",
 		abi:[
 		{
 			"inputs": [
@@ -1864,7 +1864,7 @@
 	],
 	},
 	CLIMATE: {
-		address: "0x697804E58a6a43773Be4146839dB978Baf1Bffb2",
+		address: "0x92D1B0Db9cF054487a31c55F68e38D323e4AA2fc",
 		abi:[
 		{
 			"inputs": [
@@ -3190,7 +3190,7 @@
 		}
 	],
 	},
-	BDAG: { address: '0x3eb794f1CBB0e62481C376577c6f66deDd9Bb113',
+	BDAG: { address: '0xce4cF74Fe26f5bDeee51C076fd888a1b3BCF2848',
 		abi:[
 		{
 			"inputs": [],

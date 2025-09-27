@@ -13,6 +13,7 @@ interface RoleContextType {
   checkRole: () => Promise<void>
   joinAsReporter: () => Promise<void>
   joinAsValidator: () => Promise<void>
+  upgradeToValidator: () => Promise<void>
   joinDAO: () => Promise<void>
   stakeBDAG: () => Promise<void>
   smartJoinSystem: () => Promise<void>
@@ -281,6 +282,64 @@ export function RoleProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  const upgradeToValidator = async () => {
+    if (!isConnected || !account || !isCorrectNetwork) {
+      throw new Error("Please connect to the BlockDAG network")
+    }
+
+    try {
+      const tokenContract = getContract("TOKEN")
+      const climateContract = getContract("CLIMATE")
+      
+      if (!tokenContract || !climateContract) {
+        throw new Error("Contracts not available")
+      }
+      
+      // Check current role - must be a reporter to upgrade
+      const currentRole = await climateContract.userRoles(account)
+      if (Number(currentRole) === 0) {
+        throw new Error("You must be a reporter first before upgrading to validator")
+      }
+      
+      // Check if user already has validator access
+      const currentStaked = await tokenContract.getStakedAmount(account)
+      const hasStaked = parseFloat(ethers.formatEther(currentStaked)) >= 100
+      
+      if (hasStaked) {
+        // User has staked, just call upgradeToValidator
+        console.log("🚀 Upgrading to validator (BDAG already staked)...")
+        const tx = await climateContract.upgradeToValidator()
+        console.log("⏳ Upgrade transaction submitted:", tx.hash)
+        await tx.wait()
+        console.log("✅ Successfully upgraded to validator")
+      } else {
+        // User needs to stake BDAG first, then upgrade
+        console.log("🚀 Staking BDAG for validator upgrade...")
+        const stakeTx = await tokenContract.stakeBDAG()
+        console.log("⏳ Staking transaction submitted:", stakeTx.hash)
+        await stakeTx.wait()
+        console.log("✅ BDAG staked successfully")
+        
+        // Wait a moment for the stake to be processed
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        
+        console.log("🚀 Upgrading to validator...")
+        const upgradeTx = await climateContract.upgradeToValidator()
+        console.log("⏳ Upgrade transaction submitted:", upgradeTx.hash)
+        await upgradeTx.wait()
+        console.log("✅ Successfully upgraded to validator")
+      }
+      
+      // Refresh role after upgrade
+      setTimeout(async () => {
+        await checkRole()
+      }, 1000)
+    } catch (error) {
+      console.error("❌ Error upgrading to validator:", error)
+      throw error
+    }
+  }
+
   const joinDAO = async () => {
     if (!isConnected || !account || !isCorrectNetwork) {
       throw new Error("Please connect to the BlockDAG network")
@@ -438,6 +497,7 @@ export function RoleProvider({ children }: { children: ReactNode }) {
         checkRole,
         joinAsReporter,
         joinAsValidator,
+        upgradeToValidator,
         joinDAO,
         stakeBDAG,
         smartJoinSystem,

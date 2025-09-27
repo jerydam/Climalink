@@ -14,7 +14,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { TransactionModal } from "@/components/blockchain/transaction-modal"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2, UserPlus, ShieldCheck, Users, FileText, Coins, CheckCircle, AlertCircle } from "lucide-react"
+import { Loader2, UserPlus, ShieldCheck, Users, FileText, Coins, CheckCircle, AlertCircle, ArrowUp, Crown } from "lucide-react"
 import { useState } from "react"
 
 function WelcomeNewUser() {
@@ -30,7 +30,12 @@ function WelcomeNewUser() {
     const tx = await joinAsValidator()
     return tx || "Staked and joined as validator successfully"
   }
-
+   
+  const handleUprageValidator = async (): Promise<string> => {
+    // Future upgrade logic here
+    const tx = await ("Upgraded to validator successfully")
+    return "Upgraded to validator successfully"
+  }
   return (
     <>
       <div className="min-h-screen bg-background">
@@ -229,9 +234,121 @@ function LoadingDashboard() {
   )
 }
 
+// New Validator Upgrade Component
+function ValidatorUpgradeSection({ userRole, debugInfo, router }) {
+  const [activeModal, setActiveModal] = useState<string | null>(null)
+
+  // Don't show for reporters
+  if (userRole === "reporter") {
+    return null
+  }
+
+  // Show DAO upgrade option for validators only
+  if (userRole === "validator") {
+    const canJoinDAO = parseFloat(debugInfo.cltBalance) >= parseFloat(debugInfo.membershipFee)
+    
+    return (
+      <>
+        <Card className="border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-gradient-to-br from-amber-500 to-orange-600 rounded-full flex items-center justify-center">
+                  <Crown className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-amber-800 mb-1">Upgrade to DAO Member</h3>
+                  <p className="text-sm text-amber-700 mb-2">
+                    Unlock governance participation and proposal creation!
+                  </p>
+                  <div className="flex flex-wrap gap-3 text-xs">
+                    <span className="bg-amber-100 text-amber-800 px-2 py-1 rounded">
+                      Governance Rights
+                    </span>
+                    <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded">
+                      Create Proposals
+                    </span>
+                    <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
+                      Voting Power
+                    </span>
+                  </div>
+                  <p className="text-xs text-amber-600 mt-2">
+                    Current CLT balance: {parseFloat(debugInfo.cltBalance).toFixed(2)} CLT
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-col gap-2">
+                <Button 
+                  onClick={() => router.push("/dao")}
+                  className="bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700"
+                  disabled={!canJoinDAO}
+                >
+                  <Users className="h-4 w-4 mr-2" />
+                  {canJoinDAO ? "Join DAO" : "Need More CLT"}
+                </Button>
+                {!canJoinDAO && (
+                  <p className="text-xs text-muted-foreground text-center">
+                    Need {parseFloat(debugInfo.membershipFee).toFixed(0)} CLT
+                  </p>
+                )}
+              </div>
+            </div>
+            
+            <div className="mt-4 pt-4 border-t border-amber-200">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                <div className="text-center">
+                  <p className="font-medium text-amber-800">Required</p>
+                  <p className="text-amber-600">{parseFloat(debugInfo.membershipFee).toFixed(0)} CLT tokens</p>
+                </div>
+                <div className="text-center">
+                  <p className="font-medium text-amber-800">Benefits</p>
+                  <p className="text-amber-600">Full governance access</p>
+                </div>
+                <div className="text-center">
+                  <p className="font-medium text-amber-800">Status</p>
+                  <p className="text-amber-600">Permanent membership</p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </>
+    )
+  }
+
+  // Show success status for DAO members
+  if (userRole === "dao_member") {
+    return (
+      <Card className="border-green-200 bg-green-50">
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center">
+                <Crown className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-green-800 mb-1">DAO Member & Validator</h3>
+                <p className="text-sm text-green-700">
+                  You have full access to validation and DAO governance features.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 text-green-600">
+              <CheckCircle className="h-5 w-5" />
+              <span className="text-sm font-medium">Active</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return null
+}
+
 export default function DashboardPage() {
   const { isConnected } = useWeb3()
-  const { isMember, isLoading, userRole, debugInfo } = useRole()
+  const { isMember, isLoading, userRole, debugInfo, joinAsValidator } = useRole()
   const router = useRouter()
 
   useEffect(() => {
@@ -311,62 +428,15 @@ export default function DashboardPage() {
             </Alert>
           )}
 
+          {/* Validator Upgrade Section */}
+          <ValidatorUpgradeSection 
+            userRole={userRole}
+            debugInfo={debugInfo}
+            router={router}
+          />
+
           {/* Stats Cards */}
           <StatsCards />
-
-          {/* Role-specific Information Cards */}
-          {userRole === "reporter" && !debugInfo.hasStaked && (
-            <Card className="border-blue-200 bg-blue-50">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="font-semibold text-blue-800 mb-1">Want to Earn More?</h3>
-                    <p className="text-sm text-blue-700 mb-2">
-                      Become a Validator to earn from validating reports plus get 1000 CLT staking bonus!
-                    </p>
-                    <p className="text-xs text-blue-600">
-                      Winning validators share reward pools for correct votes
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button 
-                      className="bg-blue-600 hover:bg-blue-700"
-                      onClick={() => router.push("/portfolio")}
-                    >
-                      <Coins className="h-4 w-4 mr-2" />
-                      Become Validator
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {(userRole === "validator" || effectiveRole === "pending_validator") && userRole !== "dao_member" && (
-            <Card className="border-amber-200 bg-amber-50">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="font-semibold text-amber-800 mb-1">Join the DAO</h3>
-                    <p className="text-sm text-amber-700 mb-2">
-                      Unlock governance participation and create proposals!
-                    </p>
-                    <p className="text-xs text-amber-600">
-                      Current CLT balance: {parseFloat(debugInfo.cltBalance).toFixed(2)} CLT
-                    </p>
-                  </div>
-                  <Button 
-                    className="bg-amber-600 hover:bg-amber-700"
-                    onClick={() => router.push("/dao")}
-                    disabled={parseFloat(debugInfo.cltBalance) < parseFloat(debugInfo.membershipFee)}
-                  >
-                    <Users className="h-4 w-4 mr-2" />
-                    {parseFloat(debugInfo.cltBalance) >= parseFloat(debugInfo.membershipFee) ? "Join DAO" : "Need More CLT"}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
 
           {/* Quick Access for Stakers */}
           {debugInfo.hasStaked && (
