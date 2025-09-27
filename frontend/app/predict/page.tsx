@@ -1,88 +1,124 @@
-"use client"
+// page.tsx
+"use client";
+import { useState } from "react";
+import DramaticMap from "@/components/mapnav";
+import { MainNav } from "@/components/navigation/main-nav";
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { MainNav } from "@/components/navigation/main-nav"
-import { MobileNav } from "@/components/navigation/mobile-nav"
-import { useRole } from "@/lib/roles"
-import { useWeb3 } from "@/lib/web3"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { TransactionModal } from "@/components/blockchain/transaction-modal"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Badge } from "@/components/ui/badge"
-import { 
-  Shield, 
-  Coins, 
-  Users, 
-  TrendingUp, 
-  CheckCircle, 
-  AlertCircle, 
-  Wallet, 
-  ArrowRight,
-  Crown,
-  Zap,
-  Target,
-  Award
-} from "lucide-react"
+export default function Page() {
+  const [locationDetails, setLocationDetails] = useState<any>(null);
+  const [weather, setWeather] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
 
-export default function ValidatorUpgradePage() {
-  const router = useRouter()
-  const { isConnected } = useWeb3()
-  const { userRole, isLoading, debugInfo, upgradeToValidator, joinAsReporter } = useRole()
-  const [activeModal, setActiveModal] = useState<string | null>(null)
+  const handleLocationFound = async (lat: number, lon: number) => {
+    try {
+      setError(null);
 
-  const handleUpgradeToValidator = async (): Promise<string> => {
-    const tx = await upgradeToValidator()
-    return tx || "Successfully upgraded to validator!"
-  }
+      // Reverse geocode
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`
+      );
+      const geoData = await res.json();
+      setLocationDetails(geoData);
 
-  const handleJoinAsReporter = async (): Promise<string> => {
-    const tx = await joinAsReporter()
-    return tx || "Successfully joined as reporter!"
-  }
-
-  // No restrictions - anyone can upgrade
+      // Weather (current + forecast)
+      try {
+        const weatherRes = await fetch(
+          `/api/weather?latitude=${lat}&longitude=${lon}`
+        );
+        
+        if (!weatherRes.ok) {
+          console.warn("Weather API returned error:", weatherRes.status);
+          setWeather(null);
+          return;
+        }
+        
+        const weatherData = await weatherRes.json();
+        
+        // Check if the response has the expected structure
+        if (weatherData.error) {
+          console.warn("Weather API error:", weatherData.error);
+          setWeather(null);
+          return;
+        }
+        
+        setWeather(weatherData);
+      } catch (weatherError) {
+        console.warn("Weather API not available:", weatherError);
+        setWeather(null);
+      }
+    } catch (err: any) {
+      console.error("Fetch failed:", err);
+      setError("Failed to fetch location data.");
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-background">
-      <MainNav />
-      
-      <main className="container mx-auto px-4 py-8 pb-20 md:pb-8">
-        <div className="max-w-4xl mx-auto space-y-8">
-          
-          {/* Header */}
-          <div className="text-center">
-            <h1 className="text-4xl font-bold mb-4">Upgrade to Validator</h1>
-            <p className="text-xl text-muted-foreground mb-2">
-              Unlock advanced features and earn more rewards
-            </p>
-            <p className="text-muted-foreground">
-              Stake BDAG tokens to validate reports and participate in consensus
-            </p>
-          </div>
+    <>
+    <MainNav />
+    <div className="flex max-md:flex-col h-screen">
+      {/* Map Side */}
+      <div className="w-1/2 h-full">
+        <DramaticMap onLocationFound={handleLocationFound} />
+      </div>
 
-          {/* Upgrade Action Card */}
-          <Card className="border-purple-300 bg-gradient-to-r from-purple-50 to-blue-50 border-2">
-            <CardContent className="p-8">
-              <div className="text-center">
-                <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <Shield className="h-10 w-10 text-white" />
-                </div>
-                <h2 className="text-2xl font-bold mb-3">Become a Validator</h2>
-                <p className="text-lg text-muted-foreground mb-6">
-                  Stake BDAG tokens and unlock validation features to earn more rewards
-                </p>
-                
-                {isConnected && !isLoading && (
-                  <div className="flex gap-6 justify-center text-sm mb-6">
-                    <div className="text-center">
-                      <p className="text-muted-foreground">BDAG Staked</p>
-                      <p className="font-bold text-lg">{parseFloat(debugInfo.stakedAmount).toFixed(2)}</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-muted-foreground">CLT Balance</p>
-                      <p className="font-bold text-lg">{parseFloat(debugInfo.cltBalance).toFixed(2)}</p>
+      {/* Info Side */}
+      <div className="w-1/2 h-full p-6 overflow-y-auto bg-gray-100">
+        {error && <p className="text-red-600">{error}</p>}
+
+        {locationDetails ? (
+          <>
+            <h2 className="text-2xl font-bold mb-2">📍 Location</h2>
+            <p>
+              {locationDetails.display_name ||
+                `${locationDetails.address?.road || "Unknown road"}, ${
+                  locationDetails.address?.city ||
+                  locationDetails.address?.town ||
+                  locationDetails.address?.village ||
+                  "Unknown place"
+                }`}
+            </p>
+          </>
+        ) : (
+          <p className="text-gray-500">No location selected yet.</p>
+        )}
+
+        {weather ? (
+          <div className="mt-6 space-y-8">
+            {/* Current Weather */}
+            {weather.current && (
+              <div className="p-4 bg-white rounded shadow">
+                <h2 className="text-xl font-bold mb-2">🌡️ Current Weather</h2>
+                <p>Temperature: {weather.current.temperature}°C</p>
+                <p>Humidity: {weather.current.humidity}%</p>
+                <p>Condition: {weather.current.weatherCondition}</p>
+              </div>
+            )}
+
+            {/* Daily Forecast */}
+            {weather.forecast?.forecast && (
+              <div>
+                <h2 className="text-xl font-bold mb-4">📅 Daily Forecast</h2>
+                {Object.entries(
+                  weather.forecast.forecast.reduce((acc: any, item: any) => {
+                    const day = new Date(item.timestamp).toLocaleDateString(
+                      "en-US",
+                      { weekday: "short", day: "numeric", month: "short" }
+                    );
+                    if (!acc[day]) acc[day] = [];
+                    acc[day].push(item);
+                    return acc;
+                  }, {})
+                ).map(([day, entries]: [string, any[]]) => {
+                  const temps = entries.map((f) => f.temperature);
+                  const min = Math.min(...temps).toFixed(1);
+                  const max = Math.max(...temps).toFixed(1);
+                  const condition = entries[0].weatherCondition;
+                  return (
+                    <div key={day} className="mb-3 p-3 bg-gray-50 rounded">
+                      <p className="font-semibold">{day}</p>
+                      <p>
+                        {condition}, {min}–{max}°C
+                      </p>
                     </div>
                   </div>
                 )}
@@ -252,5 +288,6 @@ export default function ValidatorUpgradePage() {
         onConfirm={handleUpgradeToValidator}
       />
     </div>
-  )
+    </>
+  );
 }
