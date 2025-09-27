@@ -14,7 +14,8 @@ import { useRole } from "@/lib/roles"
 import { useWeb3 } from "@/lib/web3"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Loader2, UserPlus, ShieldCheck, Users } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Loader2, UserPlus, ShieldCheck, Users, AlertCircle, Coins } from "lucide-react"
 import { ethers } from "ethers"
 
 interface Report {
@@ -49,14 +50,84 @@ const weatherIcons: Record<string, string> = {
   windy: "💨",
 }
 
+function ValidatorUpgrade() {
+  const { stakeBDAG, joinAsValidator, debugInfo } = useRole()
+  const [showStakeModal, setShowStakeModal] = useState(false)
+
+  const handleStakeAndUpgrade = async (): Promise<string> => {
+    // First stake BDAG, then join as validator
+    await stakeBDAG()
+    
+    // Small delay to ensure staking is processed
+    setTimeout(async () => {
+      await joinAsValidator()
+      window.location.reload() // Refresh to update role
+    }, 2000)
+    
+    return "Staking completed - upgrading to validator..."
+  }
+
+  return (
+    <>
+      <Card className="border-amber-200 bg-amber-50">
+        <CardContent className="p-6">
+          <div className="text-center">
+            <div className="w-16 h-16 bg-gradient-to-br from-amber-500 to-orange-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Coins className="h-8 w-8 text-white" />
+            </div>
+            <h2 className="text-xl font-bold text-amber-800 mb-2">Upgrade to Validator</h2>
+            <p className="text-amber-700 mb-4">
+              Stake 100 BDAG tokens to become a validator and access report validation features.
+            </p>
+            
+            <div className="bg-white rounded-lg p-4 mb-4">
+              <h3 className="font-semibold text-amber-800 mb-2">Validator Benefits:</h3>
+              <ul className="text-sm text-amber-700 space-y-1 text-left">
+                <li>• Validate community reports and earn rewards</li>
+                <li>• Get 1000 CLT tokens as staking bonus</li>
+                <li>• Share reward pools for correct validations</li>
+                <li>• Eligible for DAO membership</li>
+                <li>• Help maintain data quality</li>
+              </ul>
+            </div>
+
+            <div className="text-sm text-amber-600 mb-4">
+              <p><strong>Current CLT Balance:</strong> {parseFloat(debugInfo.cltBalance).toFixed(2)} CLT</p>
+              <p><strong>Staked BDAG:</strong> {parseFloat(debugInfo.stakedAmount).toFixed(2)} BDAG</p>
+            </div>
+            
+            <Button 
+              onClick={() => setShowStakeModal(true)}
+              className="bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white"
+            >
+              <Coins className="h-4 w-4 mr-2" />
+              Stake 100 BDAG & Become Validator
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <TransactionModal
+        isOpen={showStakeModal}
+        onClose={() => setShowStakeModal(false)}
+        title="Stake BDAG & Become Validator"
+        description="This will stake 100 BDAG tokens and upgrade you to validator status. You'll receive 1000 CLT tokens as a bonus and gain access to validation features."
+        onConfirm={handleStakeAndUpgrade}
+      />
+    </>
+  )
+}
+
 function AccessDenied() {
-  const { joinAsValidator, joinDAO, stakeBDAG } = useRole()
+  const { joinAsValidator, joinDAO, stakeBDAG, debugInfo } = useRole()
 
   return (
     <div className="min-h-screen bg-background">
       <MainNav />
       <main className="container mx-auto px-4 py-8">
-        <div className="max-w-2xl mx-auto">
+        <div className="max-w-2xl mx-auto space-y-6">
+          <BackButton href="/dashboard">Back to Dashboard</BackButton>
+          
           <Card>
             <CardContent className="p-8 text-center">
               <div className="w-16 h-16 bg-climate-gradient rounded-full flex items-center justify-center mx-auto mb-4">
@@ -64,8 +135,22 @@ function AccessDenied() {
               </div>
               <h1 className="text-2xl font-bold mb-4">Validator Access Required</h1>
               <p className="text-muted-foreground mb-6">
-                Report validation is restricted to registered validators and DAO members. Please join to access validation features.
+                Report validation requires validator or DAO member status. Choose an option below to gain access.
               </p>
+
+              {/* Show current status */}
+              <div className="bg-gray-50 rounded-lg p-4 mb-6">
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p className="text-muted-foreground">BDAG Staked</p>
+                    <p className="font-bold">{parseFloat(debugInfo.stakedAmount).toFixed(2)}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">CLT Balance</p>
+                    <p className="font-bold">{parseFloat(debugInfo.cltBalance).toFixed(2)}</p>
+                  </div>
+                </div>
+              </div>
               
               <div className="grid gap-4">
                 <Button 
@@ -73,7 +158,7 @@ function AccessDenied() {
                   className="bg-climate-green hover:bg-climate-green/90"
                 >
                   <ShieldCheck className="h-4 w-4 mr-2" />
-                  Join as Validator
+                  Stake & Become Validator
                 </Button>
                 
                 <Button 
@@ -81,11 +166,22 @@ function AccessDenied() {
                     stakeBDAG().then(() => joinDAO())
                   }}
                   variant="outline"
+                  disabled={parseFloat(debugInfo.cltBalance) < parseFloat(debugInfo.membershipFee)}
                 >
                   <Users className="h-4 w-4 mr-2" />
-                  Stake BDAG & Join DAO
+                  Join DAO (Requires {debugInfo.membershipFee} CLT)
                 </Button>
               </div>
+
+              {parseFloat(debugInfo.cltBalance) < parseFloat(debugInfo.membershipFee) && (
+                <Alert className="mt-4">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription className="text-left">
+                    You need {debugInfo.membershipFee} CLT tokens to join the DAO. 
+                    Earn CLT by submitting weather reports (20 CLT each) or become a validator first.
+                  </AlertDescription>
+                </Alert>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -126,8 +222,23 @@ export default function ValidatePage() {
   const [totalRewards, setTotalRewards] = useState(0)
 
   const { isConnected, getContract, account, provider, isCorrectNetwork } = useWeb3()
-  const { userRole, isLoading: roleLoading, isMember } = useRole()
+  const { userRole, isLoading: roleLoading, isMember, debugInfo } = useRole()
   const router = useRouter()
+
+  // Check if user can validate - more permissive access control
+  const canValidate = () => {
+    // Allow DAO members and validators
+    if (userRole === "dao_member" || userRole === "validator") {
+      return true
+    }
+    
+    // Allow users who have staked BDAG (even if role isn't updated yet)
+    if (debugInfo.hasStaked) {
+      return true
+    }
+    
+    return false
+  }
 
   useEffect(() => {
     if (!isConnected) {
@@ -161,7 +272,6 @@ export default function ValidatePage() {
         
         for (let i = Math.max(0, Number(reportCount) - maxReports); i < Number(reportCount); i++) {
           try {
-            // Use correct function name from ABI
             const reportData = await climateContract.getReport(i)
             
             // Only show pending reports for validation
@@ -173,7 +283,7 @@ export default function ValidatePage() {
                 id: i.toString(),
                 location: reportData.data.location,
                 weather: reportData.data.weather,
-                temperature: Number(reportData.data.temperature) / 100, // Convert from int128 format
+                temperature: Number(reportData.data.temperature) / 100,
                 humidity: Number(reportData.data.humidity),
                 timeAgo,
                 reporter: formatAddress(reportData.reporter),
@@ -206,8 +316,12 @@ export default function ValidatePage() {
       }
     }
 
-    fetchReports()
-  }, [isConnected, account, provider, getContract, isCorrectNetwork])
+    if (canValidate()) {
+      fetchReports()
+    } else {
+      setIsLoading(false)
+    }
+  }, [isConnected, account, provider, getContract, isCorrectNetwork, userRole, debugInfo.hasStaked])
 
   const fetchValidationHistory = async () => {
     if (!isConnected || !account || !provider || !isCorrectNetwork) return
@@ -223,7 +337,6 @@ export default function ValidatePage() {
       const currentBlock = await provider.getBlockNumber()
       const fromBlock = Math.max(0, currentBlock - 10000)
 
-      // Fetch validation events for this user using the correct event name from ABI
       const voteEvents = await climateContract.queryFilter(
         climateContract.filters.ReportVoteCast(null, account),
         fromBlock,
@@ -232,11 +345,10 @@ export default function ValidatePage() {
 
       const history: ValidationRecord[] = []
       
-      // Process vote events
       for (const event of voteEvents) {
         const block = await event.getBlock()
         const reportId = event.args?.[0]?.toString() || ""
-        const voteChoice = event.args?.[2] || 0 // 0 = Invalid, 1 = Valid
+        const voteChoice = event.args?.[2] || 0
         
         try {
           const reportData = await climateContract.getReport(reportId)
@@ -251,18 +363,14 @@ export default function ValidatePage() {
         }
       }
 
-      // Sort by most recent first
       history.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-      setValidationHistory(history.slice(0, 10)) // Keep last 10 validations
+      setValidationHistory(history.slice(0, 10))
 
-      // Calculate accuracy rate (simplified)
       const totalValidations = history.length
       const validValidations = history.filter(h => h.decision === "valid").length
       const accuracy = totalValidations > 0 ? (validValidations / totalValidations) * 100 : 0
       setAccuracyRate(accuracy)
-
-      // Calculate total rewards (simplified - in reality this would come from token events)
-      setTotalRewards(totalValidations * 10) // 10 CLT per validation
+      setTotalRewards(totalValidations * 10)
     } catch (error) {
       console.error("Error fetching validation history:", error)
     }
@@ -309,8 +417,6 @@ export default function ValidatePage() {
     }
 
     try {
-      // Use correct function name and enum values from ABI
-      // VoteChoice enum: 0 = Invalid, 1 = Valid
       const voteChoice = pendingValidation.isValid ? 1 : 0
       
       const tx = await climateContract.vote(
@@ -318,10 +424,8 @@ export default function ValidatePage() {
         voteChoice
       )
 
-      // Remove the validated report from the list
       setReports(prev => prev.filter(r => r.id !== pendingValidation.reportId))
       
-      // Refresh validation history
       setTimeout(() => {
         fetchValidationHistory()
       }, 2000)
@@ -347,8 +451,25 @@ export default function ValidatePage() {
     return <LoadingPage />
   }
 
-  if (!isMember || (userRole !== "validator" && userRole !== "dao_member")) {
+  // Show access denied if user can't validate
+  if (!canValidate()) {
     return <AccessDenied />
+  }
+
+  // Show upgrade prompt for reporters who haven't staked
+  if (userRole === "reporter" && !debugInfo.hasStaked) {
+    return (
+      <div className="min-h-screen bg-background">
+        <MainNav />
+        <main className="container mx-auto px-4 py-8 pb-20 md:pb-8">
+          <div className="space-y-8 max-w-2xl mx-auto">
+            <BackButton href="/dashboard">Back to Dashboard</BackButton>
+            <ValidatorUpgrade />
+          </div>
+        </main>
+        <MobileNav />
+      </div>
+    )
   }
 
   return (
@@ -365,6 +486,14 @@ export default function ValidatePage() {
             <p className="text-muted-foreground">
               Review and validate weather reports from the community to ensure data accuracy
             </p>
+            {debugInfo.hasStaked && userRole === "reporter" && (
+              <Alert className="mt-4 border-blue-200 bg-blue-50">
+                <AlertCircle className="h-4 w-4 text-blue-600" />
+                <AlertDescription className="text-blue-800">
+                  You have access to validation because you've staked BDAG tokens. Your role will update to "validator" shortly.
+                </AlertDescription>
+              </Alert>
+            )}
           </div>
 
           {/* Network Warning */}
@@ -418,7 +547,7 @@ export default function ValidatePage() {
 
       <MobileNav />
 
-      {/* Validation Modal */}
+      {/* Modals */}
       <ValidationModal
         report={selectedReport}
         isOpen={isModalOpen}
@@ -426,7 +555,6 @@ export default function ValidatePage() {
         onValidate={handleValidate}
       />
 
-      {/* Transaction Modal */}
       <TransactionModal
         isOpen={isTransactionModalOpen}
         onClose={() => setIsTransactionModalOpen(false)}

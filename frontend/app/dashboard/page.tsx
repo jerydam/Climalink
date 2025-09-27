@@ -13,52 +13,22 @@ import { useWeb3 } from "@/lib/web3"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { TransactionModal } from "@/components/blockchain/transaction-modal"
-import { Loader2, UserPlus, ShieldCheck, Users, FileText, Coins } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Loader2, UserPlus, ShieldCheck, Users, FileText, Coins, CheckCircle, AlertCircle } from "lucide-react"
 import { useState } from "react"
 
 function WelcomeNewUser() {
-  const { getContract, isConnected, isCorrectNetwork } = useWeb3()
+  const { smartJoinSystem, joinAsValidator, debugInfo } = useRole()
   const [activeModal, setActiveModal] = useState<string | null>(null)
 
   const handleJoinAsReporter = async (): Promise<string> => {
-    if (!isConnected || !isCorrectNetwork) {
-      throw new Error("Please connect to the BlockDAG network")
-    }
-    
-    const climateContract = getContract("CLIMATE")
-    if (!climateContract) {
-      throw new Error("Climate contract not available")
-    }
-    
-    const tx = await climateContract.joinSystem()
-    return tx.hash
+    const tx = await smartJoinSystem()
+    return tx || "Joined as reporter successfully"
   }
 
   const handleStakeAndJoinValidator = async (): Promise<string> => {
-    if (!isConnected || !isCorrectNetwork) {
-      throw new Error("Please connect to the BlockDAG network")
-    }
-    
-    const tokenContract = getContract("TOKEN")
-    if (!tokenContract) {
-      throw new Error("Token contract not available")
-    }
-    
-    const tx = await tokenContract.stakeBDAG()
-    
-    // After staking, automatically join as validator
-    setTimeout(async () => {
-      try {
-        const climateContract = getContract("CLIMATE")
-        if (climateContract) {
-          await climateContract.joinSystem()
-        }
-      } catch (error) {
-        console.error("Auto-join failed:", error)
-      }
-    }, 3000)
-    
-    return tx.hash
+    const tx = await joinAsValidator()
+    return tx || "Staked and joined as validator successfully"
   }
 
   return (
@@ -76,6 +46,22 @@ function WelcomeNewUser() {
                 Choose your role - both can earn CLT tokens in different ways
               </p>
             </div>
+
+            {/* Show current wallet status */}
+            <Card className="mb-8 border-blue-200 bg-blue-50">
+              <CardContent className="p-4">
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p className="text-muted-foreground">BDAG Staked</p>
+                    <p className="font-bold">{parseFloat(debugInfo.stakedAmount).toFixed(2)}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">CLT Balance</p>
+                    <p className="font-bold">{parseFloat(debugInfo.cltBalance).toFixed(2)}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
               {/* Reporter Option */}
@@ -167,8 +153,42 @@ function WelcomeNewUser() {
               </Card>
             </div>
 
-            {/* Rest of the component remains the same... */}
-            {/* ... (keeping the rest of the existing JSX for brevity) */}
+            {/* Smart Recommendation */}
+            {debugInfo.hasStaked && (
+              <Alert className="mb-6 border-blue-200 bg-blue-50">
+                <CheckCircle className="h-4 w-4 text-blue-600" />
+                <AlertDescription className="text-blue-800">
+                  <strong>Smart Recommendation:</strong> You have staked BDAG tokens! 
+                  We recommend joining as a validator to access validation features and earn additional rewards.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            <Card className="border-amber-200 bg-amber-50">
+              <CardContent className="p-6">
+                <h3 className="text-lg font-semibold text-amber-800 mb-3">What happens next?</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-amber-700">
+                  <div>
+                    <h4 className="font-semibold mb-2">As a Reporter:</h4>
+                    <ul className="space-y-1">
+                      <li>• Submit weather reports instantly</li>
+                      <li>• Earn 20 CLT per validated report</li>
+                      <li>• Access your earnings dashboard</li>
+                      <li>• Upgrade to validator anytime</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold mb-2">As a Validator:</h4>
+                    <ul className="space-y-1">
+                      <li>• Validate reports and earn rewards</li>
+                      <li>• Get 1000 CLT staking bonus immediately</li>
+                      <li>• Share reward pools for accuracy</li>
+                      <li>• Eligible for DAO membership</li>
+                    </ul>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </main>
       </div>
@@ -193,7 +213,6 @@ function WelcomeNewUser() {
   )
 }
 
-// Rest of the component stays the same
 function LoadingDashboard() {
   return (
     <div className="min-h-screen bg-background">
@@ -212,7 +231,7 @@ function LoadingDashboard() {
 
 export default function DashboardPage() {
   const { isConnected } = useWeb3()
-  const { isMember, isLoading, userRole } = useRole()
+  const { isMember, isLoading, userRole, debugInfo } = useRole()
   const router = useRouter()
 
   useEffect(() => {
@@ -225,7 +244,7 @@ export default function DashboardPage() {
     return <LoadingDashboard />
   }
 
-  if (!isMember) {
+  if (!isMember && !debugInfo.hasStaked) {
     return <WelcomeNewUser />
   }
 
@@ -242,6 +261,18 @@ export default function DashboardPage() {
     }
   }
 
+  // Handle edge case where user has staked but role isn't updated yet
+  const getEffectiveRole = () => {
+    if (userRole === "dao_member") return "dao_member"
+    if (userRole === "validator") return "validator"
+    if (userRole === "reporter" && debugInfo.hasStaked) return "pending_validator"
+    if (userRole === "reporter") return "reporter"
+    if (debugInfo.hasStaked) return "pending_validator"
+    return userRole
+  }
+
+  const effectiveRole = getEffectiveRole()
+
   return (
     <div className="min-h-screen bg-background">
       <MainNav />
@@ -252,19 +283,39 @@ export default function DashboardPage() {
           <div>
             <h1 className="text-3xl font-bold mb-2">
               Welcome back, {getRoleDisplayName()}!
+              {effectiveRole === "pending_validator" && " (Validator Access Pending)"}
             </h1>
             <p className="text-muted-foreground">
               Here's your ClimaLink activity overview. 
               {userRole === "reporter" && " You're earning 20 CLT per validated report!"}
               {userRole === "validator" && " You're earning from validation accuracy and sharing reward pools!"}
+              {effectiveRole === "pending_validator" && " Your validator access is being processed..."}
             </p>
           </div>
+
+          {/* Role Status Alerts */}
+          {effectiveRole === "pending_validator" && (
+            <Alert className="border-blue-200 bg-blue-50">
+              <AlertCircle className="h-4 w-4 text-blue-600" />
+              <AlertDescription className="text-blue-800">
+                <strong>Validator Access Detected:</strong> You have staked BDAG tokens and can access validation features. 
+                Your role will update to "Validator" shortly. You can start validating reports now!
+                <Button 
+                  variant="link" 
+                  className="p-0 h-auto ml-2 text-blue-800 underline"
+                  onClick={() => router.push("/validate")}
+                >
+                  Go to Validation
+                </Button>
+              </AlertDescription>
+            </Alert>
+          )}
 
           {/* Stats Cards */}
           <StatsCards />
 
           {/* Role-specific Information Cards */}
-          {userRole === "reporter" && (
+          {userRole === "reporter" && !debugInfo.hasStaked && (
             <Card className="border-blue-200 bg-blue-50">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
@@ -291,22 +342,49 @@ export default function DashboardPage() {
             </Card>
           )}
 
-          {userRole === "validator" && (
+          {(userRole === "validator" || effectiveRole === "pending_validator") && userRole !== "dao_member" && (
             <Card className="border-amber-200 bg-amber-50">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="font-semibold text-amber-800 mb-1">Join the DAO</h3>
                     <p className="text-sm text-amber-700 mb-2">
-                      Unlock governance participation and create proposals! Requires 1000 CLT membership fee.
+                      Unlock governance participation and create proposals! Requires {debugInfo.membershipFee} CLT membership fee.
+                    </p>
+                    <p className="text-xs text-amber-600">
+                      Current CLT balance: {parseFloat(debugInfo.cltBalance).toFixed(2)} CLT
                     </p>
                   </div>
                   <Button 
                     className="bg-amber-600 hover:bg-amber-700"
                     onClick={() => router.push("/dao")}
+                    disabled={parseFloat(debugInfo.cltBalance) < parseFloat(debugInfo.membershipFee)}
                   >
                     <Users className="h-4 w-4 mr-2" />
-                    Join DAO
+                    {parseFloat(debugInfo.cltBalance) >= parseFloat(debugInfo.membershipFee) ? "Join DAO" : "Need More CLT"}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Quick Access for Stakers */}
+          {debugInfo.hasStaked && (
+            <Card className="border-green-200 bg-green-50">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-semibold text-green-800 mb-1">Validator Features Available</h3>
+                    <p className="text-sm text-green-700 mb-2">
+                      You have staked BDAG tokens and can access validation features to earn additional rewards.
+                    </p>
+                  </div>
+                  <Button 
+                    className="bg-green-600 hover:bg-green-700"
+                    onClick={() => router.push("/validate")}
+                  >
+                    <ShieldCheck className="h-4 w-4 mr-2" />
+                    Start Validating
                   </Button>
                 </div>
               </CardContent>

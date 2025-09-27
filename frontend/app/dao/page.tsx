@@ -86,6 +86,33 @@ function DAOJoinSection({ eligibility }: { eligibility: DAOEligibility }) {
     return tx.hash
   }
 
+  // Get contract addresses safely
+  const getDaoContractAddress = () => {
+    const daoContract = getContract("DAO")
+    if (!daoContract) return undefined
+    
+    // Try different ways to get the contract address
+    return daoContract.target || daoContract.address || daoContract.getAddress?.()
+  }
+
+  const handleOpenJoinModal = () => {
+    const daoAddress = getDaoContractAddress()
+    console.log("DAO Contract Address:", daoAddress)
+    console.log("Approval Amount:", eligibility.requiredCLT)
+    
+    if (!daoAddress) {
+      alert("DAO contract not available. Please try again.")
+      return
+    }
+    
+    if (!eligibility.requiredCLT || eligibility.requiredCLT === "0") {
+      alert("Invalid membership fee amount. Please refresh the page.")
+      return
+    }
+    
+    setShowJoinModal(true)
+  }
+
   if (eligibility.isLoading) {
     return (
       <Card className="mb-6">
@@ -197,7 +224,7 @@ function DAOJoinSection({ eligibility }: { eligibility: DAOEligibility }) {
                 </AlertDescription>
               </Alert>
               <Button 
-                onClick={() => setShowJoinModal(true)}
+                onClick={handleOpenJoinModal}
                 className="w-full bg-purple-600 hover:bg-purple-700"
                 size="lg"
               >
@@ -255,13 +282,18 @@ function DAOJoinSection({ eligibility }: { eligibility: DAOEligibility }) {
       </Card>
 
       {/* Join Modal */}
-      <TransactionModal
-        isOpen={showJoinModal}
-        onClose={() => setShowJoinModal(false)}
-        title="Join DAO"
-        description={`Pay ${eligibility.requiredCLT} CLT tokens to join the DAO. You'll gain voting rights, proposal creation, and governance participation.`}
-        onConfirm={handleJoinDAO}
-      />
+      {showJoinModal && (
+        <TransactionModal
+          isOpen={showJoinModal}
+          onClose={() => setShowJoinModal(false)}
+          title="Join DAO"
+          description={`Pay ${eligibility.requiredCLT} CLT tokens to join the DAO. You'll gain voting rights, proposal creation, and governance participation.`}
+          onConfirm={handleJoinDAO}
+          requiresApproval={true}
+          approvalAmount={eligibility.requiredCLT}
+          approvalSpender={getDaoContractAddress()}
+        />
+      )}
     </>
   )
 }
@@ -344,8 +376,74 @@ export default function DAOPage() {
   const [proposals, setProposals] = useState<Proposal[]>([])
   const [isLoadingProposals, setIsLoadingProposals] = useState(true)
   
-  const { isConnected, getContract, account, isCorrectNetwork } = useWeb3()
+  const { isConnected, getContract, account, isCorrectNetwork, provider } = useWeb3()
   const router = useRouter()
+
+  // Debug functions
+  const debugContractAddresses = () => {
+    const tokenContract = getContract("TOKEN")
+    const daoContract = getContract("DAO")
+    
+    console.log("Debug Contract Info:")
+    console.log("Token Contract:", tokenContract?.address || "Not found")
+    console.log("DAO Contract:", daoContract?.address || "Not found")
+    console.log("Connected Account:", account)
+    console.log("Network Connected:", isCorrectNetwork)
+    console.log("Provider:", !!provider)
+  }
+
+  const testBasicContractCalls = async () => {
+    try {
+      const tokenContract = getContract("TOKEN")
+      const daoContract = getContract("DAO")
+      
+      if (!tokenContract || !daoContract) {
+        console.error("Contracts not available")
+        return
+      }
+      
+      console.log("Testing basic contract calls...")
+      
+      // Test DAO calls
+      try {
+        const membershipFee = await daoContract.MEMBERSHIP_FEE()
+        console.log("✅ DAO MEMBERSHIP_FEE:", ethers.formatEther(membershipFee), "CLT")
+      } catch (e) {
+        console.error("❌ Failed to get membership fee:", e.message)
+      }
+      
+      try {
+        const isMember = await daoContract.isMember(account)
+        console.log("✅ DAO isMember:", isMember)
+      } catch (e) {
+        console.error("❌ Failed to check membership:", e.message)
+      }
+      
+      // Test Token calls
+      try {
+        const balance = await tokenContract.balanceOf(account)
+        console.log("✅ Token balance:", ethers.formatEther(balance), "CLT")
+      } catch (e) {
+        console.error("❌ Failed to get token balance:", e.message)
+      }
+      
+      try {
+        const stakedAmount = await tokenContract.getStakedAmount(account)
+        console.log("✅ Staked amount:", ethers.formatEther(stakedAmount), "BDAG")
+      } catch (e) {
+        console.error("❌ Failed to get staked amount:", e.message)
+      }
+      
+    } catch (error) {
+      console.error("❌ Test failed:", error)
+    }
+  }
+
+  const runDiagnostics = () => {
+    console.log("🔍 Running DAO Diagnostics...")
+    debugContractAddresses()
+    testBasicContractCalls()
+  }
 
   useEffect(() => {
     if (!isConnected) {
@@ -365,21 +463,57 @@ export default function DAOPage() {
         const daoContract = getContract("DAO")
 
         if (!tokenContract || !daoContract) {
+          console.warn("Contracts not available")
           setEligibility(prev => ({ ...prev, isLoading: false }))
           return
         }
 
-        const [
-          membershipFee,
-          stakedAmount,
-          cltBalance,
-          isDaoMember
-        ] = await Promise.all([
-          daoContract.MEMBERSHIP_FEE(),
-          tokenContract.getStakedAmount(account),
-          tokenContract.balanceOf(account),
-          daoContract.isMember(account)
-        ])
+        // Check DAO membership first (this is the most important check)
+        let isDaoMember = false
+        try {
+          isDaoMember = await daoContract.isMember(account)
+        } catch (memberError) {
+          console.warn("Could not check DAO membership:", memberError.message)
+          // Continue with other checks
+        }
+        
+        if (isDaoMember) {
+          // If already a member, set state and return early
+          setEligibility({
+            hasStaked: true,
+            hasCLTBalance: true,
+            requiredCLT: "1000",
+            currentCLT: "0",
+            stakedAmount: "0",
+            canJoin: false,
+            alreadyMember: true,
+            isLoading: false
+          })
+          return
+        }
+
+        // Get membership fee and other requirements with individual error handling
+        let membershipFee = ethers.parseEther("1000") // Default fallback
+        let stakedAmount = BigInt(0)
+        let cltBalance = BigInt(0)
+
+        try {
+          membershipFee = await daoContract.MEMBERSHIP_FEE()
+        } catch (feeError) {
+          console.warn("Could not get membership fee, using default 1000 CLT:", feeError.message)
+        }
+
+        try {
+          stakedAmount = await tokenContract.getStakedAmount(account)
+        } catch (stakeError) {
+          console.warn("Could not get staked amount:", stakeError.message)
+        }
+
+        try {
+          cltBalance = await tokenContract.balanceOf(account)
+        } catch (balanceError) {
+          console.warn("Could not get CLT balance:", balanceError.message)
+        }
 
         const requiredCLT = ethers.formatEther(membershipFee)
         const currentCLT = ethers.formatEther(cltBalance)
@@ -401,7 +535,18 @@ export default function DAOPage() {
         })
       } catch (error) {
         console.error("Error checking DAO eligibility:", error)
-        setEligibility(prev => ({ ...prev, isLoading: false }))
+        
+        // Set default state on error
+        setEligibility({
+          hasStaked: false,
+          hasCLTBalance: false,
+          requiredCLT: "1000",
+          currentCLT: "0",
+          stakedAmount: "0",
+          canJoin: false,
+          alreadyMember: false,
+          isLoading: false
+        })
       }
     }
 
@@ -481,6 +626,16 @@ export default function DAOPage() {
               Participate in ClimaLink governance, vote on proposals, and shape the platform's future
             </p>
           </div>
+
+          {/* Debug Button (remove in production) */}
+          <Button 
+            variant="outline" 
+            onClick={runDiagnostics}
+            className="mb-4"
+            size="sm"
+          >
+            Run Diagnostics
+          </Button>
 
           {/* Join Section - Always show this */}
           <DAOJoinSection eligibility={eligibility} />

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
-import { Lock, Plus, AlertTriangle, Loader2, Clock, Coins } from "lucide-react"
+import { Lock, Plus, AlertTriangle, Loader2, Clock, Coins, CheckCircle } from "lucide-react"
 import { useWeb3 } from "@/lib/web3"
 import { TransactionModal } from "@/components/blockchain/transaction-modal"
 import { ethers } from "ethers"
@@ -22,6 +22,8 @@ interface StakingData {
   isStakeActive: boolean
   autoMintAmount: string
   isEligibleForMinting: boolean
+  allowance: string
+  hasApproval: boolean
 }
 
 export function StakingDashboard() {
@@ -36,10 +38,14 @@ export function StakingDashboard() {
     isStakeActive: false,
     autoMintAmount: "0",
     isEligibleForMinting: false,
+    allowance: "0",
+    hasApproval: false,
   })
   const [isLoading, setIsLoading] = useState(true)
+  const [showApprovalModal, setShowApprovalModal] = useState(false)
   const [showStakeModal, setShowStakeModal] = useState(false)
   const [showUnstakeModal, setShowUnstakeModal] = useState(false)
+  const [isProcessing, setIsProcessing] = useState(false)
   
   const { account, isConnected, getContract, provider, isCorrectNetwork } = useWeb3()
 
@@ -69,7 +75,8 @@ export function StakingDashboard() {
           minimumStake,
           autoMintAmount,
           isEligibleForMinting,
-          userBalance
+          userBalance,
+          allowance
         ] = await Promise.all([
           tokenContract.getStakedAmount(account),
           tokenContract.stakingTimestamp(account),
@@ -78,33 +85,38 @@ export function StakingDashboard() {
           tokenContract.BDAG_STAKE_AMOUNT(),
           tokenContract.MINT_AMOUNT(),
           tokenContract.isEligibleForMinting(account),
-          tokenContract.balanceOf(account) // This would be BDAG balance in real implementation
+          tokenContract.balanceOf(account),
+          // Check allowance - using token contract address as the spender since staking is built into the token contract
+          tokenContract.allowance(account, await tokenContract.getAddress())
         ])
 
         const stakedFormatted = ethers.formatEther(stakedAmount)
         const stakingTime = Number(stakingTimestamp)
         const unlockTimestamp = Number(unlockTime)
-        const lockPeriodDays = Number(lockPeriod) / (24 * 60 * 60) // Convert seconds to days
+        const lockPeriodDays = Number(lockPeriod) / (24 * 60 * 60)
+        const minimumStakeFormatted = ethers.formatEther(minimumStake)
+        const allowanceFormatted = ethers.formatEther(allowance)
 
         // Format dates
         const stakeDate = stakingTime > 0 ? new Date(stakingTime * 1000).toLocaleDateString() : ""
         const unlockDate = unlockTimestamp > 0 ? new Date(unlockTimestamp * 1000).toLocaleDateString() : ""
 
-        // For demo purposes, simulate BDAG balance
-        // In production, this would query the actual BDAG token contract
-        const availableBalance = "500.00" // Mock available BDAG balance
+        // Check if user has sufficient approval
+        const hasApproval = parseFloat(allowanceFormatted) >= parseFloat(minimumStakeFormatted)
 
         setStakingData({
           currentStake: parseFloat(stakedFormatted).toFixed(2),
           stakeDate,
           unlockDate,
           unlockTime: unlockTimestamp,
-          availableBalance,
+          availableBalance: ethers.formatEther(userBalance),
           stakeLockPeriod: lockPeriodDays,
-          minimumStake: ethers.formatEther(minimumStake),
+          minimumStake: minimumStakeFormatted,
           isStakeActive: parseFloat(stakedFormatted) > 0,
           autoMintAmount: ethers.formatEther(autoMintAmount),
           isEligibleForMinting,
+          allowance: allowanceFormatted,
+          hasApproval,
         })
       } catch (error) {
         console.error("Error fetching staking data:", error)
@@ -120,7 +132,7 @@ export function StakingDashboard() {
     if (!stakingData.isStakeActive || stakingData.unlockTime === 0) return 0
     
     const now = Math.floor(Date.now() / 1000)
-    const totalLockTime = stakingData.stakeLockPeriod * 24 * 60 * 60 // Convert days to seconds
+    const totalLockTime = stakingData.stakeLockPeriod * 24 * 60 * 60
     const stakeStartTime = stakingData.unlockTime - totalLockTime
     const elapsedTime = now - stakeStartTime
     const progress = (elapsedTime / totalLockTime) * 100
@@ -145,6 +157,39 @@ export function StakingDashboard() {
     return parseFloat(stakingData.availableBalance) >= parseFloat(stakingData.minimumStake)
   }
 
+  const handleApproval = async (): Promise<string> => {
+    if (!isConnected || !isCorrectNetwork) {
+      throw new Error("Please connect to the BlockDAG network")
+    }
+
+    const tokenContract = getContract("TOKEN")
+    
+    if (!tokenContract) {
+      throw new Error("Token contract not available")
+    }
+
+    // Since staking is built into the token contract, we approve the token contract itself
+    const stakingAddress = await tokenContract.getAddress()
+    const amountToApprove = ethers.parseEther(stakingData.minimumStake)
+
+    setIsProcessing(true)
+    try {
+      const tx = await tokenContract.approve(stakingAddress, amountToApprove)
+      
+      // Wait for transaction confirmation
+      await tx.wait()
+      
+      // Refresh data after approval
+      setTimeout(() => {
+        window.location.reload()
+      }, 2000)
+      
+      return tx.hash
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
   const handleStakeBDAG = async (): Promise<string> => {
     if (!isConnected || !isCorrectNetwork) {
       throw new Error("Please connect to the BlockDAG network")
@@ -155,14 +200,19 @@ export function StakingDashboard() {
       throw new Error("Token contract not available")
     }
 
-    const tx = await tokenContract.stakeBDAG()
-    
-    // Refresh data after transaction
-    setTimeout(() => {
-      window.location.reload()
-    }, 3000)
-    
-    return tx.hash
+    setIsProcessing(true)
+    try {
+      const tx = await tokenContract.stakeBDAG()
+      
+      // Refresh data after transaction
+      setTimeout(() => {
+        window.location.reload()
+      }, 3000)
+      
+      return tx.hash
+    } finally {
+      setIsProcessing(false)
+    }
   }
 
   const handleUnstakeBDAG = async (): Promise<string> => {
@@ -175,14 +225,19 @@ export function StakingDashboard() {
       throw new Error("Token contract not available")
     }
 
-    const tx = await tokenContract.unstakeBDAG()
-    
-    // Refresh data after transaction
-    setTimeout(() => {
-      window.location.reload()
-    }, 3000)
-    
-    return tx.hash
+    setIsProcessing(true)
+    try {
+      const tx = await tokenContract.unstakeBDAG()
+      
+      // Refresh data after transaction
+      setTimeout(() => {
+        window.location.reload()
+      }, 3000)
+      
+      return tx.hash
+    } finally {
+      setIsProcessing(false)
+    }
   }
 
   if (!isConnected) {
@@ -295,22 +350,72 @@ export function StakingDashboard() {
                 </div>
               </div>
 
+              {/* Approval Status */}
+              <div className="bg-muted/50 p-3 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium">Approval Status</p>
+                    <p className="text-xs text-muted-foreground">
+                      Approved: {stakingData.allowance} BDAG
+                    </p>
+                  </div>
+                  {stakingData.hasApproval ? (
+                    <CheckCircle className="h-5 w-5 text-climate-green" />
+                  ) : (
+                    <AlertTriangle className="h-5 w-5 text-orange-500" />
+                  )}
+                </div>
+              </div>
+
               <div className="space-y-3">
-                <Button 
-                  className="w-full bg-sky-blue hover:bg-sky-blue/90"
-                  onClick={() => setShowStakeModal(true)}
-                  disabled={!canStakeMore() || !isCorrectNetwork}
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Stake {stakingData.minimumStake} BDAG
-                </Button>
+                {/* Approval Button - only show if not approved */}
+                {!stakingData.hasApproval && canStakeMore() && (
+                  <Button 
+                    className="w-full bg-orange-500 hover:bg-orange-600"
+                    onClick={() => setShowApprovalModal(true)}
+                    disabled={!canStakeMore() || !isCorrectNetwork || isProcessing}
+                  >
+                    {isProcessing ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        Approve {stakingData.minimumStake} BDAG
+                      </>
+                    )}
+                  </Button>
+                )}
+
+                {/* Stake Button - only show if approved */}
+                {stakingData.hasApproval && (
+                  <Button 
+                    className="w-full bg-sky-blue hover:bg-sky-blue/90"
+                    onClick={() => setShowStakeModal(true)}
+                    disabled={!canStakeMore() || !isCorrectNetwork || isProcessing}
+                  >
+                    {isProcessing ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Stake {stakingData.minimumStake} BDAG
+                      </>
+                    )}
+                  </Button>
+                )}
 
                 {stakingData.isStakeActive && (
                   <Button 
                     variant="outline"
                     className="w-full"
                     onClick={() => setShowUnstakeModal(true)}
-                    disabled={!isUnlockTime() || !isCorrectNetwork}
+                    disabled={!isUnlockTime() || !isCorrectNetwork || isProcessing}
                   >
                     <Coins className="h-4 w-4 mr-2" />
                     {isUnlockTime() ? "Unstake All BDAG" : `Unlock in ${getDaysLeft()} days`}
@@ -340,6 +445,15 @@ export function StakingDashboard() {
 
           {/* Important Warnings */}
           <div className="space-y-4">
+            {!stakingData.hasApproval && (
+              <Alert>
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                  <strong>Approval Required:</strong> You need to approve the staking contract to spend your BDAG tokens before you can stake. This is a one-time transaction.
+                </AlertDescription>
+              </Alert>
+            )}
+
             <Alert>
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
@@ -382,6 +496,14 @@ export function StakingDashboard() {
       </Card>
 
       {/* Transaction Modals */}
+      <TransactionModal
+        isOpen={showApprovalModal}
+        onClose={() => setShowApprovalModal(false)}
+        title="Approve BDAG Tokens"
+        description={`Approve the staking contract to spend ${stakingData.minimumStake} BDAG tokens. This is a one-time approval required before staking.`}
+        onConfirm={handleApproval}
+      />
+
       <TransactionModal
         isOpen={showStakeModal}
         onClose={() => setShowStakeModal(false)}
