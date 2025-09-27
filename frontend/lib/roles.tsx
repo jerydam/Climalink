@@ -1,8 +1,9 @@
 "use client"
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react"
+import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from "react"
 import { useWeb3 } from "@/lib/web3"
 import { ethers } from "ethers"
+import { useRouter, usePathname } from "next/navigation"
 
 export type UserRole = "dao_member" | "reporter" | "validator" | "none"
 
@@ -48,8 +49,11 @@ export function RoleProvider({ children }: { children: ReactNode }) {
   })
   
   const { account, isConnected, getContract, isCorrectNetwork } = useWeb3()
+  const router = useRouter()
+  const pathname = usePathname()
 
-  const checkRole = async () => {
+  // Improved checkRole function with better error handling
+  const checkRole = useCallback(async () => {
     console.log("🔍 Checking user role...", { account, isConnected, isCorrectNetwork })
     
     if (!isConnected || !account || !isCorrectNetwork) {
@@ -67,7 +71,11 @@ export function RoleProvider({ children }: { children: ReactNode }) {
       const tokenContract = getContract("TOKEN")
 
       const contractsAvailable = !!(daoContract && climateContract && tokenContract)
-      console.log("📋 Contract availability:", { daoContract: !!daoContract, climateContract: !!climateContract, tokenContract: !!tokenContract })
+      console.log("📋 Contract availability:", { 
+        daoContract: !!daoContract, 
+        climateContract: !!climateContract, 
+        tokenContract: !!tokenContract 
+      })
 
       if (!contractsAvailable) {
         console.error("❌ Contracts not available")
@@ -78,30 +86,57 @@ export function RoleProvider({ children }: { children: ReactNode }) {
         return
       }
 
-      // Fetch all relevant data with error handling
+      // Fetch all relevant data with Promise.allSettled for better error handling
       const [
-        isDaoMember,
-        climateRole,
-        stakedAmount,
-        cltBalance,
-        isEligibleForMinting,
-        membershipFee,
-        daoAllowance
-      ] = await Promise.all([
-        daoContract!.isMember(account).catch((e) => { console.warn("DAO member check failed:", e); return false; }),
-        climateContract!.userRoles(account).catch((e) => { console.warn("Climate role check failed:", e); return 0; }),
-        tokenContract!.getStakedAmount(account).catch((e) => { console.warn("Staked amount check failed:", e); return ethers.parseEther("0"); }),
-        tokenContract!.balanceOf(account).catch((e) => { console.warn("CLT balance check failed:", e); return ethers.parseEther("0"); }),
-        tokenContract!.isEligibleForMinting(account).catch((e) => { console.warn("Minting eligibility check failed:", e); return false; }),
-        daoContract!.MEMBERSHIP_FEE().catch((e) => { console.warn("Membership fee check failed:", e); return ethers.parseEther("1000"); }),
-        tokenContract!.allowance(account, daoContract!.target || daoContract!.address).catch((e) => { console.warn("Allowance check failed:", e); return ethers.parseEther("0"); })
+        isDaoMemberResult,
+        climateRoleResult,
+        stakedAmountResult,
+        cltBalanceResult,
+        isEligibleForMintingResult,
+        membershipFeeResult,
+        daoAllowanceResult
+      ] = await Promise.allSettled([
+        daoContract!.isMember(account),
+        climateContract!.userRoles(account),
+        tokenContract!.getStakedAmount(account),
+        tokenContract!.balanceOf(account),
+        tokenContract!.isEligibleForMinting(account),
+        daoContract!.MEMBERSHIP_FEE(),
+        tokenContract!.allowance(account, daoContract!.target || daoContract!.address)
       ])
+
+      // Extract values with proper error handling and fallbacks
+      const isDaoMember = isDaoMemberResult.status === 'fulfilled' ? isDaoMemberResult.value : false
+      const climateRole = climateRoleResult.status === 'fulfilled' ? climateRoleResult.value : 0
+      const stakedAmount = stakedAmountResult.status === 'fulfilled' ? stakedAmountResult.value : ethers.parseEther("0")
+      const cltBalance = cltBalanceResult.status === 'fulfilled' ? cltBalanceResult.value : ethers.parseEther("0")
+      const isEligibleForMinting = isEligibleForMintingResult.status === 'fulfilled' ? isEligibleForMintingResult.value : false
+      const membershipFee = membershipFeeResult.status === 'fulfilled' ? membershipFeeResult.value : ethers.parseEther("1000")
+      const daoAllowance = daoAllowanceResult.status === 'fulfilled' ? daoAllowanceResult.value : ethers.parseEther("0")
+
+      // Log any failed promises for debugging
+      const failedPromises = [
+        { name: 'isDaoMember', result: isDaoMemberResult },
+        { name: 'climateRole', result: climateRoleResult },
+        { name: 'stakedAmount', result: stakedAmountResult },
+        { name: 'cltBalance', result: cltBalanceResult },
+        { name: 'isEligibleForMinting', result: isEligibleForMintingResult },
+        { name: 'membershipFee', result: membershipFeeResult },
+        { name: 'daoAllowance', result: daoAllowanceResult }
+      ].filter(p => p.result.status === 'rejected')
+
+      if (failedPromises.length > 0) {
+        console.warn("⚠️ Some contract calls failed:", failedPromises.map(p => ({
+          name: p.name,
+          reason: p.result.status === 'rejected' ? p.result.reason : 'Unknown'
+        })))
+      }
 
       const stakedFormatted = ethers.formatEther(stakedAmount)
       const cltFormatted = ethers.formatEther(cltBalance)
       const membershipFeeFormatted = ethers.formatEther(membershipFee)
       const daoAllowanceFormatted = ethers.formatEther(daoAllowance)
-      const hasStaked = parseFloat(stakedFormatted) >= 100 // Must have at least 100 BDAG staked
+      const hasStaked = parseFloat(stakedFormatted) >= 100
       const climateRoleNum = Number(climateRole)
 
       // Update debug info
@@ -139,8 +174,6 @@ export function RoleProvider({ children }: { children: ReactNode }) {
         memberStatus = true
         console.log("✅ User detected as DAO member")
       } else if (climateRoleNum > 0) {
-        // If user has staked BDAG, they should be a validator
-        // If they haven't staked, they should be a reporter
         if (hasStaked && climateRoleNum >= 1) {
           role = "validator"
           console.log("✅ User detected as Validator (has staked BDAG)")
@@ -164,12 +197,47 @@ export function RoleProvider({ children }: { children: ReactNode }) {
       console.error("❌ Error checking user role:", error)
       setUserRole("none")
       setIsMember(false)
+      setDebugInfo(prev => ({ ...prev, contractsAvailable: false }))
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [account, isConnected, isCorrectNetwork, getContract])
 
-  // Smart join system - assigns role based on staking status
+  // Improved transaction success handling with better routing
+  const handleTransactionSuccess = useCallback((operation: string, customRedirect?: string) => {
+    console.log(`✅ ${operation} completed successfully`)
+    
+    // Don't redirect from landing page or if already on dashboard
+    const isLandingPage = pathname === "/" || pathname === ""
+    const isDashboardPage = pathname?.includes('/dashboard')
+    
+    if (isLandingPage) {
+      console.log("ℹ️ On landing page, no redirect needed")
+      return
+    }
+    
+    // Wait for blockchain state to update, then refresh role
+    setTimeout(async () => {
+      try {
+        await checkRole()
+        
+        // Navigate to appropriate page
+        if (customRedirect) {
+          console.log(`🚀 Redirecting to custom path: ${customRedirect}`)
+          router.push(customRedirect)
+        } else if (!isDashboardPage) {
+          console.log("🚀 Redirecting to dashboard")
+          router.push("/dashboard")
+        } else {
+          console.log("ℹ️ Already on dashboard, no redirect needed")
+        }
+      } catch (error) {
+        console.error("Failed to refresh role after transaction:", error)
+      }
+    }, 2000) // 2 second delay to allow blockchain state to update
+  }, [pathname, router, checkRole])
+
+  // Smart join system with improved error handling
   const smartJoinSystem = async () => {
     if (!isConnected || !account || !isCorrectNetwork) {
       throw new Error("Please connect to the BlockDAG network")
@@ -185,7 +253,6 @@ export function RoleProvider({ children }: { children: ReactNode }) {
       
       console.log("🤖 Smart joining system...")
       
-      // Check current staking status
       const stakedAmount = await tokenContract.getStakedAmount(account)
       const hasStaked = parseFloat(ethers.formatEther(stakedAmount)) >= 100
       
@@ -194,21 +261,12 @@ export function RoleProvider({ children }: { children: ReactNode }) {
         hasStaked 
       })
       
-      // Join the climate system (this sets initial role based on staking status)
       const tx = await climateContract.joinSystem()
       console.log("⏳ Transaction submitted:", tx.hash)
       await tx.wait()
       
-      if (hasStaked) {
-        console.log("✅ Joined as validator (has staked BDAG)")
-      } else {
-        console.log("✅ Joined as reporter (no BDAG staked)")
-      }
-      
-      // Wait a bit then refresh role
-      setTimeout(async () => {
-        await checkRole()
-      }, 2000)
+      console.log(hasStaked ? "✅ Joined as validator" : "✅ Joined as reporter")
+      handleTransactionSuccess("Smart join system")
     } catch (error) {
       console.error("❌ Error joining system:", error)
       throw error
@@ -228,12 +286,9 @@ export function RoleProvider({ children }: { children: ReactNode }) {
       const tx = await climateContract.joinSystem()
       console.log("⏳ Transaction submitted:", tx.hash)
       await tx.wait()
-      console.log("✅ Successfully joined as reporter")
       
-      // Immediately refresh role
-      setTimeout(async () => {
-        await checkRole()
-      }, 1000)
+      console.log("✅ Successfully joined as reporter")
+      handleTransactionSuccess("Join as reporter")
     } catch (error) {
       console.error("❌ Error joining as reporter:", error)
       throw error
@@ -253,7 +308,6 @@ export function RoleProvider({ children }: { children: ReactNode }) {
         throw new Error("Contracts not available")
       }
       
-      // First, ensure user has staked BDAG
       const currentStaked = await tokenContract.getStakedAmount(account)
       const hasStaked = parseFloat(ethers.formatEther(currentStaked)) >= 100
       
@@ -269,12 +323,9 @@ export function RoleProvider({ children }: { children: ReactNode }) {
       const tx = await climateContract.joinSystem()
       console.log("⏳ Transaction submitted:", tx.hash)
       await tx.wait()
-      console.log("✅ Successfully joined as validator")
       
-      // Immediately refresh role
-      setTimeout(async () => {
-        await checkRole()
-      }, 1000)
+      console.log("✅ Successfully joined as validator")
+      handleTransactionSuccess("Join as validator")
     } catch (error) {
       console.error("❌ Error joining as validator:", error)
       throw error
@@ -307,7 +358,7 @@ export function RoleProvider({ children }: { children: ReactNode }) {
         console.log("✅ BDAG staked successfully")
       }
 
-      // Ensure user is in climate system (join as validator since they staked)
+      // Ensure user is in climate system
       const currentRole = await climateContract.userRoles(account)
       if (Number(currentRole) === 0) {
         console.log("🚀 Joining climate system as validator first...")
@@ -334,13 +385,12 @@ export function RoleProvider({ children }: { children: ReactNode }) {
         throw new Error(`Insufficient CLT balance. You have ${balanceFormatted} CLT but need ${feeFormatted} CLT to join DAO.`)
       }
 
-      // Check current allowance for DAO contract
+      // Check and approve allowance if needed
       const currentAllowance = await tokenContract.allowance(account, daoContract.target || daoContract.address)
       const allowanceFormatted = ethers.formatEther(currentAllowance)
       
       console.log("🔐 Current DAO allowance:", allowanceFormatted)
 
-      // Step 1: Approve DAO contract to spend CLT tokens if needed
       if (parseFloat(allowanceFormatted) < parseFloat(feeFormatted)) {
         console.log("🚀 Approving DAO contract to spend CLT tokens...")
         const approveTx = await tokenContract.approve(
@@ -351,29 +401,26 @@ export function RoleProvider({ children }: { children: ReactNode }) {
         await approveTx.wait()
         console.log("✅ Token approval confirmed")
         
-        // Wait a moment for the approval to be processed
+        // Wait for the approval to be processed
         await new Promise(resolve => setTimeout(resolve, 1000))
       } else {
         console.log("✅ DAO already has sufficient allowance")
       }
       
-      // Step 2: Join the DAO
+      // Join the DAO
       console.log("🚀 Joining DAO...")
       const tx = await daoContract.joinDao()
       console.log("⏳ DAO join transaction submitted:", tx.hash)
       await tx.wait()
       console.log("✅ Successfully joined DAO")
       
-      // Immediately refresh role
-      setTimeout(async () => {
-        await checkRole()
-      }, 1000)
+      handleTransactionSuccess("Join DAO")
     } catch (error) {
       console.error("❌ Error joining DAO:", error)
       
       // Provide more specific error messages
       if (error.message && error.message.includes("Insufficient balance")) {
-        throw new Error("Failed to transfer CLT tokens. Please ensure you have approved the DAO contract to spend your tokens and have sufficient balance.")
+        throw new Error("Failed to transfer CLT tokens. Please ensure you have sufficient balance and the DAO contract is approved to spend your tokens.")
       }
       
       throw error
@@ -404,10 +451,7 @@ export function RoleProvider({ children }: { children: ReactNode }) {
       await tx.wait()
       console.log("✅ BDAG staked successfully")
       
-      // Immediately refresh role
-      setTimeout(async () => {
-        await checkRole()
-      }, 1000)
+      handleTransactionSuccess("BDAG staking")
     } catch (error) {
       // Handle already staked error gracefully
       if (error.message && (error.message.includes("Already staked") || error.message.includes("already staked"))) {
@@ -419,15 +463,43 @@ export function RoleProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  // Better connection monitoring with debouncing
   useEffect(() => {
+    let mounted = true
+    let timeoutId: NodeJS.Timeout
+
     if (isConnected && account && isCorrectNetwork) {
-      checkRole()
+      // Debounce the checkRole call to avoid rapid calls
+      timeoutId = setTimeout(() => {
+        if (mounted) {
+          checkRole()
+        }
+      }, 500)
     } else {
+      // Only update state if component is still mounted
+      if (mounted) {
+        setUserRole("none")
+        setIsMember(false)
+        setIsLoading(false)
+      }
+    }
+
+    return () => {
+      mounted = false
+      if (timeoutId) {
+        clearTimeout(timeoutId)
+      }
+    }
+  }, [account, isConnected, isCorrectNetwork, checkRole])
+
+  // Reset state when account changes
+  useEffect(() => {
+    if (account) {
+      setIsLoading(true)
       setUserRole("none")
       setIsMember(false)
-      setIsLoading(false)
     }
-  }, [account, isConnected, isCorrectNetwork])
+  }, [account])
 
   return (
     <RoleContext.Provider
