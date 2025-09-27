@@ -155,7 +155,7 @@ function AccessDenied() {
               <div className="grid gap-4">
                 <Button 
                   onClick={joinAsValidator}
-                  className="bg-climate-green hover:bg-climate-green/90"
+                  className="bg-green-600 hover:bg-green-600/90"
                 >
                   <ShieldCheck className="h-4 w-4 mr-2" />
                   Stake & Become Validator
