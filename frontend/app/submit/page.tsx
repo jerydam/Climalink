@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button"
 import { ArrowLeftIcon } from "@heroicons/react/24/outline"
 import { useRole } from "@/lib/roles"
 import { useWeb3 } from "@/lib/web3"
+import Link from "next/link"
 import { Card, CardContent } from "@/components/ui/card"
 import { Loader2, UserPlus, ShieldCheck, MapPin, CloudSun, AlertTriangle, Users } from "lucide-react"
 
@@ -507,7 +508,10 @@ export default function SubmitReportPage() {
                         </>
                       )}
                     </Button>
+                    <Link href={"/predict"}
+                    className="w-full">  <Button>Predict the future</Button></Link>
                   </div>
+                
                 </CardContent>
               </Card>
 
