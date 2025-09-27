@@ -134,9 +134,7 @@ contract ClimaLinkDao is ReentrancyGuard, Pausable, Ownable(msg.sender) {
         require(tokenContract.getStakedAmount(msg.sender) >= MINIMUM_STAKE, "Must stake minimum 100 BDAG");
         require(tokenContract.getBalanceOfUser(msg.sender) >= MEMBERSHIP_FEE, "Must have minimum 1000 CLT");
         
-        // Transfer membership fee
-        require(tokenContract.transfer(address(this), MEMBERSHIP_FEE), "Membership fee transfer failed");
-        
+       
         uint128 id = membersCount + 1;
         Member memory newMember = Member({
             memberId: id,

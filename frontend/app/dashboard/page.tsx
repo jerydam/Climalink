@@ -349,7 +349,7 @@ export default function DashboardPage() {
                   <div>
                     <h3 className="font-semibold text-amber-800 mb-1">Join the DAO</h3>
                     <p className="text-sm text-amber-700 mb-2">
-                      Unlock governance participation and create proposals! Requires {debugInfo.membershipFee} CLT membership fee.
+                      Unlock governance participation and create proposals!
                     </p>
                     <p className="text-xs text-amber-600">
                       Current CLT balance: {parseFloat(debugInfo.cltBalance).toFixed(2)} CLT

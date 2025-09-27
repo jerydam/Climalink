@@ -362,7 +362,7 @@ Climalink/
 
 ### DAO Participation
 1. Stake 100 BDAG and maintain 1000 CLT.
-2. Pay 1000 CLT to join DAO via `joinDao`.
+2. Join DAO via `joinDao`.
 3. Create or vote on proposals via `createProposal` and `vote`.
 4. Proposals execute with 51% quorum after 1-hour delay.
 

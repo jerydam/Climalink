@@ -345,8 +345,6 @@ export function MembershipStatus() {
                   <span>Hold minimum 1000 CLT tokens</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                  <span>Pay 1000 CLT membership fee (one-time)</span>
                 </div>
               </div>
               <p className="text-xs text-blue-600">
