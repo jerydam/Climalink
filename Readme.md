@@ -5,7 +5,7 @@
 ClimaLink empowers users to submit real-time weather reports, view forecasts (present and future), validate community-submitted data, and participate in decentralized autonomous organization (DAO) governance, earning CLT (ClimaLink Token) rewards. Built on blockchain technology, ClimaLink ensures transparency, incentivizes accurate reporting, and fosters community-driven climate data integrity.  Submitted data is stored on-chain, and as accumulation rises, it will power future ML-based weather prediction.
 
 Link to Demo Video
-[VIDEO LINK](https://www.loom.com/share/ea27d692a4fe4e03b0690504c75bf04c)
+[VIDEO LINK](https://www.loom.com/share/688ff1d72a4f460cb43994b8767c7806)
 
 Link to Live
 [LIVE LINK](https://climalink.vercel.app)
