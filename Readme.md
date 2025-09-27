@@ -1,12 +1,28 @@
 # ClimaLink - Decentralized Climate Reporting Platform
 
-A blockchain-based platform for community-driven climate data collection, validation, and governance. ClimaLink enables users to submit weather reports, validate community data, and participate in decentralized autonomous organization (DAO) governance while earning CLT tokens.
+**A blockchain-based platform for community-driven climate data collection, validation, and governance.**
+
+ClimaLink empowers users to submit real-time weather reports, validate community-submitted data, and participate in decentralized autonomous organization (DAO) governance, earning CLT (ClimaLink Token) rewards. Built on blockchain technology, ClimaLink ensures transparency, incentivizes accurate reporting, and fosters community-driven climate data integrity.
+
+## Hackathon Submission Overview
+
+**Problem Addressed**: Traditional weather data sources are often centralized, lack transparency, and may not cover remote or underserved regions. ClimaLink solves this by enabling decentralized, community-driven weather reporting with blockchain-verified data and governance.
+
+**Solution**: A Web3 platform where users submit weather reports, validators ensure data accuracy, and a DAO governs platform decisions. Staking and token rewards incentivize participation, while smart contracts ensure trust and transparency.
+
+**Target Audience**: Climate researchers, developers, communities in underserved regions, and Web3 enthusiasts.
+
+**Impact**: Provides reliable, decentralized climate data, promotes global participation, and empowers communities to contribute to and govern a transparent climate data ecosystem.
+
+---
 
 ## Table of Contents
 
+- [Hackathon Submission Overview](#hackathon-submission-overview)
 - [Overview](#overview)
 - [Features](#features)
 - [Technology Stack](#technology-stack)
+- [Backend Structure](#backend-structure)
 - [Smart Contracts](#smart-contracts)
 - [Installation](#installation)
 - [Project Structure](#project-structure)
@@ -17,485 +33,421 @@ A blockchain-based platform for community-driven climate data collection, valida
 - [Validation Process](#validation-process)
 - [DAO Governance](#dao-governance)
 - [Security Features](#security-features)
+- [Roadmap](#roadmap)
 - [Contributing](#contributing)
 - [License](#license)
+- [Acknowledgments](#acknowledgments)
+
+---
 
 ## Overview
 
-ClimaLink is a decentralized platform that incentivizes accurate climate reporting through blockchain technology. Users can earn CLT (ClimaLink Token) rewards by submitting weather data and validating reports from other community members. The platform features a built-in DAO for governance decisions and uses BDAG token staking for membership verification.
+ClimaLink is a decentralized platform that leverages blockchain technology to crowdsource accurate climate data globally. Users submit weather reports, validators verify data accuracy, and a DAO governs platform operations. The platform uses CLT tokens for rewards and BDAG token staking for membership, ensuring economic incentives and trustless operation.
 
 ### Key Benefits
+- **Decentralized Data Collection**: Global community-driven weather reporting.
+- **Data Integrity**: Multi-validator consensus ensures reliable data.
+- **Incentivized Participation**: Earn 20 CLT tokens per validated report.
+- **Transparent Governance**: DAO-based decision-making with 51% quorum.
+- **Immutable Records**: Blockchain ensures tamper-proof data and transactions.
+- **Role Progression**: Automatic upgrades from Reporter to Validator via DAO membership.
 
-- **Decentralized Data Collection**: Community-driven weather reporting from global locations
-- **Quality Assurance**: Multi-validator system ensures data accuracy with 24-hour voting periods
-- **Economic Incentives**: Token rewards for contributors and validators with automatic minting
-- **Democratic Governance**: DAO-based decision making with 51% quorum requirements
-- **Transparency**: All data and transactions recorded on blockchain
-- **Role Progression**: Automatic upgrades from Reporter to Validator based on DAO membership
+---
 
 ## Features
 
 ### Core Functionality
-
-- **Weather Report Submission**: Submit real-time weather data with location coordinates
-- **Community Validation**: 24-hour voting period with validator consensus mechanism
-- **Interactive Climate Map**: Visualize global climate reports in real-time
-- **Token Rewards**: Earn 20 CLT tokens for validated reports
-- **DAO Governance**: Participate in platform decisions through proposal voting with 1-hour voting delay
-- **Staking System**: Stake 100 BDAG tokens with 60-day lock period for enhanced privileges
-- **Automatic Role Upgrades**: Seamless progression from Reporter to Validator upon DAO membership
+- **Weather Report Submission**: Submit real-time weather data with GPS coordinates.
+- **Community Validation**: 24-hour validator voting ensures data accuracy.
+- **Interactive Climate Map**: Visualize global climate data in real-time.
+- **Token Rewards**: Earn 20 CLT tokens for validated reports.
+- **DAO Governance**: Participate in platform decisions with 1-hour voting delays.
+- **Staking System**: Stake 100 BDAG tokens for 60 days to unlock privileges.
+- **Role Upgrades**: Seamless progression to Validator role via DAO membership.
 
 ### User Features
+- **Wallet Integration**: Connect MetaMask or other Web3 wallets.
+- **Profile Management**: Track contributions, achievements, and reputation.
+- **Transaction History**: View blockchain interactions and token earnings.
+- **Achievement System**: Unlock badges for participation milestones.
+- **Real-time Statistics**: Monitor personal and platform-wide metrics.
+- **Role Status**: Check current role and upgrade eligibility.
 
-- **Wallet Integration**: Connect MetaMask and other Web3 wallets
-- **Profile Management**: Track your contributions, achievements, and reputation
-- **Transaction History**: View all blockchain interactions and token earnings
-- **Achievement System**: Unlock badges and rewards for platform participation
-- **Real-time Statistics**: Monitor personal and global platform metrics
-- **Role Status**: View current role and upgrade eligibility
+---
 
 ## Technology Stack
 
 ### Frontend
-- **Next.js 14** - React framework with App Router
-- **TypeScript** - Type-safe development
-- **Tailwind CSS** - Utility-first CSS framework
-- **shadcn/ui** - Modern UI component library
-- **Lucide Icons** - Comprehensive icon set
+- **Next.js 15**: React framework with App Router for dynamic UI.
+- **TypeScript**: Type-safe development for robust code.
+- **Tailwind CSS**: Utility-first CSS for responsive design.
+- **shadcn/ui**: Modern, reusable UI components.
+- **Lucide Icons**: Comprehensive icon library for intuitive visuals.
+
+### Backend
+- **Node.js**: Server-side runtime for API handling.
+- **Express.js**: Framework for building RESTful APIs.
+- **Weather APIs**: Integration with external weather services (e.g., OpenWeatherMap).
+- **MongoDB**: Database for caching API responses and user metadata.
 
 ### Blockchain Integration
-- **Ethers.js v6** - Ethereum blockchain interaction
-- **Wagmi** - React hooks for Ethereum
-- **Web3Modal** - Multi-wallet connection
-- **Smart Contracts** - Solidity-based contracts with security features
+- **Ethers.js v6**: Ethereum blockchain interaction library.
+- **Wagmi**: React hooks for Web3 wallet connectivity.
+- **Web3Modal**: Multi-wallet connection support.
+- **Solidity**: Smart contracts for token, climate, and DAO logic.
 
 ### State Management
-- **React Context** - Global state management
-- **Custom Hooks** - Reusable blockchain interaction logic
+- **React Context**: Global state for user and blockchain data.
+- **Custom Hooks**: Reusable logic for blockchain interactions.
+
+---
+
+## Backend Structure
+
+The backend of ClimaLink is designed to handle weather data retrieval, processing, and integration with the blockchain, ensuring seamless interaction between the frontend, external weather APIs, and smart contracts. Below is the structure and workflow for managing current weather and forecast data.
+
+### Directory Structure
+```
+backend/
+├── .env                    # Environment variables (API keys, blockchain endpoints)
+├── .gitignore             # Ignore node_modules, env files
+├── package.json           # Node.js dependencies and scripts
+├── pnpm-lock.yaml         # Package lock for dependency consistency
+├── server.js              # Main Express server entry point
+├── controllers/
+│   └── weatherController.js # Handles weather API logic
+├── routes/
+│   └── api.js             # Defines API endpoints
+└── services/
+    └── weatherService.js  # Interacts with external weather APIs
+```
+
+### Components and Workflow
+
+1. **server.js**:
+   - Initializes the Express server.
+   - Configures middleware (CORS, JSON parsing, error handling).
+   - Mounts API routes from `routes/api.js`.
+   - Connects to MongoDB for data storage and Redis for caching.
+
+2. **controllers/weatherController.js**:
+   - Handles HTTP requests for weather data.
+   - Processes data from `weatherService.js` and formats responses.
+   - Example response for current weather data (as provided in your code):
+     ```javascript
+     return {
+         latitude,
+         longitude,
+         temperature: apiData.main.temp,
+         humidity: apiData.main.humidity,
+         weatherCondition: apiData.weather[0].main || apiData.weather[0].description || 'Unknown',
+         timestamp: new Date(apiData.dt * 1000), // Convert UNIX timestamp to Date
+         confidence: 0.95,
+     };
+     ```
+   - This structure is used to standardize weather data returned to the frontend or submitted to the blockchain via the `Climate` smart contract.
+
+3. **routes/api.js**:
+   - Defines RESTful endpoints:
+     - `GET /api/current`: Fetches current weather for given coordinates.
+     - `GET /api/forecast`: Retrieves 5-day weather forecast.
+     - `POST /api/weather/submit`: Submits user weather reports to the blockchain.
+   - Routes requests to appropriate controllers.
+
+4. **services/weatherService.js**:
+   - Integrates with external weather APIs (e.g., OpenWeatherMap) to fetch current and forecast data.
+   - Validates input coordinates (latitude ±90°, longitude ±180°).
+   - Caches API responses in Redis to reduce external API calls.
+   - Formats data to align with the `ReportData` struct in the `Climate` smart contract:
+     ```solidity
+     struct ReportData {
+         string weather;
+         string location;
+         int128 temperature;
+         int128 longitude;
+         int128 latitude;
+         uint128 humidity;
+     }
+     ```
+
+### Current Weather Workflow
+1. **User Request**: The frontend sends a `GET /api/current?lat=<latitude>&lon=<longitude>` request.
+2. **Cache Check**: `weatherService.js` checks Redis for cached data.
+3. **API Call**: If no cache, it queries an external API (e.g., OpenWeatherMap) using an API key from `.env`.
+4. **Data Processing**: `weatherController.js` formats the response:
+   - Converts UNIX timestamp (`apiData.dt`) to a JavaScript `Date` object (`new Date(apiData.dt * 1000)`).
+   - Extracts temperature, humidity, and weather condition.
+   - Adds a confidence score (hardcoded at 0.95 for API data).
+5. **Response**: Returns the formatted object to the frontend for display or submission to the blockchain.
+6. **Blockchain Submission**: If a user submits a report, the data is sent to the `createReport` function in the `Climate` contract, which validates and stores it on-chain.
+
+### Forecast Workflow
+1. **User Request**: The frontend sends a `GET /api/forecast?lat=<latitude>&lon=<longitude>` request.
+2. **Cache Check**: Redis is queried for cached forecast data.
+3. **API Call**: If no cache, `weatherService.js` fetches a 5-day forecast from the external API.
+4. **Data Processing**: Aggregates forecast data (e.g., daily averages for temperature, humidity).
+5. **Response**: Returns a list of forecast objects to the frontend, each including:
+   - Date (converted from UNIX timestamp).
+   - Temperature, humidity, and weather conditions.
+   - Confidence score (0.95 for API data).
+6. **Display**: The frontend renders the forecast on the interactive climate map.
+
+### Integration with Blockchain
+- **Report Submission**: Users submit weather reports via the `submit/` page, which calls `POST /api/submit`. The backend validates the data and invokes the `createReport` function in the `Climate` contract.
+- **Validation**: Validators access pending reports via the `validate/` page, which queries the `getActiveReports` function. Votes are submitted to the `vote` function.
+- **Rewards**: Upon report finalization, the backend triggers `distributeRewards` to mint CLT tokens.
+
+### Scalability and Optimization
+- **Redis Caching**: Reduces API calls by caching weather data for 5 minutes.
+- **MongoDB**: Stores user metadata and report history for quick retrieval.
+- **Rate Limiting**: Enforced on the blockchain (max 10 reports/day) and backend to prevent abuse.
+- **Error Handling**: Robust validation for API responses and user inputs.
+
+---
 
 ## Smart Contracts
 
 ### Contract Addresses
-
 | Contract | Address | Purpose |
 |----------|---------|---------|
-| CLT Token | `0xb6147E56105f09086C1DC3eb7d6A595F1818b499` | ERC-20 reward token with staking |
-| DAO Contract | `0x8FfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF` | Governance, voting, and membership |
-| Climate Reports | `0x50AdE72a0bF3F424505c3828D140C976B99b7D06` | Report storage and validation |
+| CLT Token | `0xb6147E56105f09086C1DC3eb7d6A595F1818b499` | ERC-20 reward token with staking. |
+| DAO Contract | `0x8FfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF` | Governance, voting, and membership. |
+| Climate Reports | `0x50AdE72a0bF3F424505c3828D140C976B99b7D06` | Report storage and validation. |
 
 ### Key Contract Functions
-
 #### CLT Token Contract
-- `stakeBDAG()` - Stake 100 BDAG tokens and receive 1000 CLT tokens automatically
-- `unstakeBDAG()` - Unstake tokens after 60-day lock period
-- `mint(address, amount)` - Mint rewards to users (authorized minters only)
-- `balanceOf(address)` - Get user's CLT balance
-- `getStakedAmount(address)` - Get user's staked BDAG amount
-- `getUnlockTime(address)` - Get unstaking unlock timestamp
-- `isEligibleForMinting(address)` - Check if user has staked minimum BDAG
+- `stakeBDAG()`: Stake 100 BDAG tokens, receive 1000 CLT.
+- `unstakeBDAG()`: Unstake after 60-day lock.
+- `mint(address, amount)`: Mint CLT rewards (authorized only).
+- `balanceOf(address)`: Check CLT balance.
+- `getStakedAmount(address)`: View staked BDAG amount.
+- `getUnlockTime(address)`: Check unstaking unlock time.
+- `isEligibleForMinting(address)`: Verify staking eligibility.
 
 #### Climate Contract
-- `createClimateReport(ReportInput)` - Submit weather report (reporters only)
-- `voteOnReport(uint128, VoteChoice)` - Vote on report validity (validators only)
-- `finalizeReport(uint128)` - Finalize report after voting deadline
-- `joinAsReporterOrValidator()` - Register role with automatic DAO member upgrades
-- `getClimateReport(uint128)` - Retrieve detailed report data
-- `getActiveVotingReports()` - Get all reports currently in voting phase
-- `checkAndUpgradeRole(address)` - Check and upgrade user role eligibility
+- `createClimateReport(ReportInput)`: Submit weather reports (Reporters only).
+- `voteOnReport(uint128, VoteChoice)`: Vote on report validity (Validators only).
+- `finalizeReport(uint128)`: Finalize reports post-voting.
+- `joinAsReporterOrValidator()`: Register roles with DAO upgrades.
+- `getClimateReport(uint128)`: Retrieve report data.
+- `getActiveVotingReports()`: List reports in voting phase.
+- `checkAndUpgradeRole(address)`: Upgrade roles based on eligibility.
 
 #### DAO Contract
-- `joinDao()` - Join DAO with 1000 CLT membership fee and 100 BDAG stake requirement
-- `createProposal(string, string, uint128)` - Create governance proposal
-- `vote(uint128, VoteType)` - Vote on proposals after 1-hour delay
-- `executeProposal(uint128)` - Execute passed proposals meeting 51% quorum
-- `viewProposals()` - Get all proposals with voting data
-- `getMemberList()` - Get active DAO members
-- `notifyUnstake(address)` - Remove member when they unstake BDAG
+- `joinDao()`: Join DAO with 1000 CLT fee and 100 BDAG stake.
+- `createProposal(string, string, uint128)`: Create governance proposals.
+- `vote(uint128, VoteType)`: Vote on proposals after 1-hour delay.
+- `executeProposal(uint128)`: Execute passed proposals (51% quorum).
+- `viewProposals()`: List all proposals.
+- `getMemberList()`: View active DAO members.
+- `notifyUnstake(address)`: Remove members upon unstaking.
+
+---
 
 ## Installation
 
 ### Prerequisites
-
-- Node.js 18+ and npm/yarn/pnpm
-- Git
-- MetaMask or compatible Web3 wallet
-- BDAG tokens for staking (minimum 100 BDAG)
+- Node.js 18+ and npm/yarn/pnpm.
+- Git.
+- MetaMask or compatible Web3 wallet.
+- BDAG tokens (minimum 100 for staking).
 
 ### Setup
-
-1. **Clone the repository**
+1. **Clone Repository**:
    ```bash
    git clone https://github.com/your-org/climalink.git
    cd climalink
    ```
-
-2. **Install dependencies**
+2. **Install Dependencies**:
    ```bash
    pnpm install
    # or
    yarn install
    ```
-
-3. **Environment Configuration**
-   Create a `.env.local` file:
+3. **Configure Environment**:
+   Create `.env.local` in `frontend/`:
    ```env
    NEXT_PUBLIC_NETWORK=mainnet
    NEXT_PUBLIC_INFURA_ID=your_infura_project_id
    NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_walletconnect_id
    ```
-
-4. **Run the development server**
-   ```bash
-   npm run dev
-   # or
-   yarn dev
+   Create `.env` in `backend/`:
+   ```env
+   WEATHER_API_KEY=your_openweathermap_key
+   MONGODB_URI=your_mongodb_connection_string
+   REDIS_URL=your_redis_connection_string
    ```
+4. **Run Backend**:
+   ```bash
+   cd backend
+   node server.js
+   ```
+5. **Run Frontend**:
+   ```bash
+   cd frontend
+   npm run dev
+   ```
+6. **Access**: Open `http://localhost:3000`.
 
-5. **Open in browser**
-   Navigate to `http://localhost:3000`
+---
 
 ## Project Structure
-
 ```
-Climalink/
-├── Readme.md
-├── backend/
-│   ├── .env
-│   ├── .gitignore
-│   ├── package.json
-│   ├── pnpm-lock.yaml
-│   ├── server.js
-│   ├── controllers/
-│   │   └── weatherController.js
-│   ├── routes/
-│   │   └── api.js
-│   └── services/
-│       └── weatherService.js
-├── frontend/
-│   ├── .gitignore
-│   ├── components.json
-│   ├── next.config.mjs
-│   ├── package.json
-│   ├── pnpm-lock.yaml
-│   ├── postcss.config.mjs
-│   ├── Readme.md
-│   ├── tsconfig.json
-│   ├── app/
-│   │   ├── favicon.ico
-│   │   ├── globals.css
-│   │   ├── layout.tsx
-│   │   ├── page.tsx
-│   │   ├── api/
-│   │   │   └── weather/
-│   │   ├── blockchain/
-│   │   │   └── page.tsx
-│   │   ├── create/
-│   │   │   └── page.tsx
-│   │   ├── dao/
-│   │   │   └── page.tsx
-│   │   ├── dashboard/
-│   │   │   └── page.tsx
-│   │   ├── portfolio/
-│   │   │   ├── loading.tsx
-│   │   │   └── page.tsx
-│   │   ├── predict/
-│   │   │   └── page.tsx
-│   │   ├── profile/
-│   │   │   └── page.tsx
-│   │   ├── submit/
-│   │   │   └── page.tsx
-│   │   └── validate/
-│   │       └── page.tsx
-│   ├── components/
-│   │   ├── back.tsx
-│   │   ├── mapnav.tsx
-│   │   ├── theme-provider.tsx
-│   │   ├── auth/
-│   │   │   └── role-guard.tsx
-│   │   ├── blockchain/
-│   │   ├── dao/
-│   │   ├── dashboard/
-│   │   ├── navigation/
-│   │   ├── portfolio/
-│   │   ├── profile/
-│   │   ├── submit/
-│   │   ├── ui/
-│   │   └── validation/
-│   │       └── ...
-│   ├── hooks/
-│   │   ├── use-contract.ts
-│   │   ├── use-mobile.ts
-│   │   └── use-toast.ts
-│   ├── lib/
-│   │   ├── contracts.ts
-│   │   ├── leaflet-fix.ts
-│   │   ├── roles.tsx
-│   │   ├── utils.ts
-│   │   └── web3.tsx
-│   ├── public/
-│   │   ├── placeholder-logo.png
-│   │   ├── placeholder-logo.svg
-│   │   ├── placeholder-user.jpg
-│   │   ├── placeholder.jpg
-│   │   └── placeholder.svg
-│   ├── styles/
-│   │   └── globals.css
-│   └── utils/
-│       └── fixLeafletIcons.ts
-├── smart contract/
-│   ├── .gitignore
-│   ├── .gitmodules
-│   ├── foundry.toml
-│   ├── README.md
-│   ├── lib/
-│   │   └── forge-std/
-│   ├── script/
-│   │   └── Counter.s.sol
-│   ├── src/
-│   │   ├── BdagToken.sol
-│   │   ├── climate.sol
-│   │   ├── dao.sol
-│   │   └── token.sol
-│   └── test/
-│       └── Counter.t.sol
+climalink/
+├── components/           # Reusable UI components
+│   ├── ui/              # Base UI components (buttons, cards, etc.)
+│   ├── dashboard/       # Dashboard-specific components
+│   ├── profile/         # User profile components
+│   ├── blockchain/      # Web3 integration components
+│   ├── navigation/      # Navigation components
+│   └── validation/      # Report validation components
+├── contexts/            # React context providers
+│   ├── role-context.tsx # User role management
+│   └── web3-context.tsx # Blockchain connection
+├── lib/                 # Utility libraries
+│   ├── contracts.ts     # Smart contract ABIs and addresses
+│   ├── web3.ts         # Web3 utility functions
+│   └── utils.ts        # General utilities
+├── app/                # Next.js app router pages
+│   ├── dashboard/      # Main dashboard
+│   ├── submit/         # Report submission
+│   ├── validate/       # Report validation
+│   ├── portfolio/      # Token management
+│   ├── profile/        # User profile
+│   └── blockchain/     # Blockchain interactio
+└── public/             # Static assets
+```
 
 ## Usage Guide
 
 ### Getting Started
-
-1. **Connect Wallet**: Click "Connect Wallet" and select your preferred wallet
-2. **Stake BDAG Tokens**: Stake minimum 100 BDAG to get 1000 CLT automatically
-3. **Choose Role**: Start as Reporter or upgrade to Validator through DAO membership
-4. **Start Contributing**: Begin submitting reports or validating community data
+1. **Connect Wallet**: Use MetaMask via the "Connect Wallet" button.
+2. **Stake BDAG**: Stake 100 BDAG tokens to receive 1000 CLT.
+3. **Choose Role**: Start as a Reporter or upgrade to Validator via DAO.
+4. **Contribute**: Submit reports or validate data.
 
 ### Submitting Reports
-
-1. Navigate to "Submit Report" (Reporter role required)
-2. Set your location (GPS coordinates: longitude ±180°, latitude ±90°)
-3. Input weather data:
-   - Temperature: -100°C to +100°C
-   - Humidity: 0-100%
-   - Weather conditions (max 50 characters)
-   - Location description (max 100 characters)
-4. Review and submit to blockchain
-5. Wait for 24-hour validation period
-6. Earn 20 CLT tokens if report is validated
+1. Navigate to `submit/` page (Reporter role required).
+2. Enter:
+   - Location (latitude ±90°, longitude ±180°).
+   - Temperature (-100°C to +100°C).
+   - Humidity (0-100%).
+   - Weather condition (max 50 chars).
+   - Location description (max 100 chars).
+3. Submit to blockchain via `createReport`.
+4. Await 24-hour validation; earn 20 CLT if validated.
 
 ### Validating Reports
-
-1. Access "Validate" page (Validator role required)
-2. Review pending reports in 24-hour voting window
-3. Compare with external weather data sources
-4. Vote "Valid" or "Invalid" (cannot vote on own reports)
-5. Reports finalize when >51% of validators agree or deadline expires
-6. Early finalization possible with majority consensus
+1. Access `validate/` page (Validator role required).
+2. Review pending reports within 24-hour voting window.
+3. Cross-reference with external weather data.
+4. Vote "Valid" or "Invalid" via `voteOnReport`.
+5. Reports finalize with >51% consensus or after 24 hours.
 
 ### DAO Participation
+1. Stake 100 BDAG and maintain 1000 CLT.
+2. Pay 1000 CLT to join DAO via `joinDao`.
+3. Create or vote on proposals via `createProposal` and `vote`.
+4. Proposals execute with 51% quorum after 1-hour delay.
 
-1. Stake minimum 100 BDAG tokens
-2. Maintain minimum 1000 CLT balance
-3. Pay 1000 CLT membership fee to join DAO
-4. Automatic upgrade to Validator role upon joining
-5. Create proposals with 1-30 day duration
-6. Vote on proposals after 1-hour delay period
-7. Execute proposals meeting 51% quorum requirement
+---
 
 ## User Roles
 
 ### Reporter (Entry Level)
-- **Requirements**: Stake 100 BDAG tokens (receive 1000 CLT)
-- **Abilities**: Submit weather reports with location data
-- **Rewards**: 20 CLT tokens per validated report
-- **Upgrade Path**: Automatic upgrade to Validator upon DAO membership
+- **Requirements**: Stake 100 BDAG (receive 1000 CLT).
+- **Abilities**: Submit weather reports.
+- **Rewards**: 20 CLT per validated report.
+- **Upgrade**: Auto-upgrades to Validator upon DAO membership.
 
 ### Validator (Advanced Level)
-- **Requirements**: 
-  - DAO membership (1000 CLT fee + 100 BDAG stake)
-  - Maintain 1000 CLT balance
-  - Keep 100 BDAG staked
-- **Abilities**: All Reporter privileges plus report validation voting
-- **Rewards**: Reporter rewards plus validation participation rewards
-- **Governance**: Full DAO voting rights
-
-### Automatic Role Upgrades
-- System automatically upgrades Reporters to Validators when they join the DAO
-- Real-time eligibility checking and seamless role transitions
-- No manual upgrade process required
-
-## Token Economy
-
-### CLT Token (ClimaLink Token)
-- **Total Supply**: 1 billion tokens maximum
-- **Distribution**: Automatic minting for staking and rewards
-- **Initial Mint**: 1000 CLT when staking 100 BDAG
-- **Report Rewards**: 20 CLT per validated report
-- **DAO Fee**: 1000 CLT membership fee
-
-### BDAG Token Staking
-- **Minimum Stake**: 100 BDAG tokens required
-- **Lock Period**: 60 days (approximately 2 months)
-- **Benefits**: CLT minting eligibility, DAO access, platform participation
-- **Auto-unstake**: DAO membership automatically removed when unstaking
-
-### Economic Model
-- **Entry Cost**: 100 BDAG stake + 1000 CLT (for DAO/Validator)
-- **Earning Potential**: 20 CLT per validated report
-- **Governance Participation**: Proposal voting and creation rights
-- **Long-term Commitment**: 60-day lock encourages platform stability
-
-## Staking System
-
-### BDAG Staking Process
-1. **Stake**: Call `stakeBDAG()` with 100 BDAG minimum
-2. **Automatic Rewards**: Receive 1000 CLT tokens immediately
-3. **Lock Period**: Tokens locked for 60 days from stake time
-4. **Unstaking**: Call `unstakeBDAG()` after lock period expires
-5. **Consequences**: Unstaking removes DAO membership and Validator status
-
-### Staking Benefits
-- Immediate 1000 CLT token mint
-- Eligibility for additional CLT rewards
-- Access to Reporter role and report submission
-- DAO membership eligibility with additional requirements
-- Platform governance participation
-
-## Validation Process
-
-### Report Validation Workflow
-1. **Submission**: Reporter submits weather report with location data
-2. **Voting Period**: 24-hour window for validator voting
-3. **Validator Voting**: Active validators vote "Valid" or "Invalid"
-4. **Consensus Rules**:
-   - Early finalization if >51% of validators agree
-   - Final decision based on majority after 24 hours
-   - Reporter cannot vote on their own reports
-5. **Rewards**: 20 CLT minted to reporter if validated
-
-### Quality Assurance
-- Multi-validator consensus mechanism
-- Geographic and temporal data validation
-- External weather data cross-referencing recommended
-- Blacklisting system for malicious actors
-
-## DAO Governance
-
-### Membership Requirements
-- Stake minimum 100 BDAG tokens
-- Maintain minimum 1000 CLT balance
-- Pay 1000 CLT membership fee
-- Meet continuous eligibility requirements
-
-### Proposal System
-- **Creation**: Members can create proposals with 1-30 day duration
-- **Voting Delay**: 1-hour delay before voting begins
-- **Quorum**: 51% of active members required
-- **Execution**: Automatic execution for passed proposals
-- **Expiration**: Unmet proposals expire after deadline
-
-### Governance Powers
-- Platform parameter updates
-- Smart contract upgrades
-- Economic model adjustments
-- Community dispute resolution
-- Strategic decision making
-
-## Security Features
-
-### Smart Contract Security
-- **ReentrancyGuard**: Protection against reentrancy attacks
-- **Pausable**: Emergency pause functionality for all contracts
-- **Ownable**: Admin controls for critical functions
-- **SafeMath**: Overflow protection for mathematical operations
-- **Blacklisting**: Malicious actor prevention system
-
-### Access Controls
-- **Authorized Minters**: Controlled CLT token minting
-- **Role-based Permissions**: Function access based on user roles
-- **Validation Checks**: Input validation and business logic enforcement
-- **Time Locks**: Stake lock periods and voting delays
-
-### Emergency Features
-- **Contract Pausing**: Owner can pause operations
-- **Emergency Withdrawal**: Admin fund recovery mechanisms
-- **Member Removal**: Blacklisting and automatic unstaking
-- **Proposal Extensions**: Deadline extensions for critical votes
-
-## Roadmap
-
-### Phase 1 (Current)
-- Basic reporting and validation with 24-hour cycles
-- DAO governance implementation with 51% quorum
-- Token economics launch with automatic staking rewards
-- Role-based system with automatic upgrades
-
-### Phase 2 (Late 2025 - Q1 2026)
-- Mobile application with full functionality
-- Advanced analytics dashboard with validation metrics
-- API for third-party integrations and data access
-- Enhanced validator reputation system
-
-### Phase 3 (Q1 2026 - Q2 2026)
-- Machine learning validation assistance
-- NFT achievement system for long-term contributors
-- Climate emergency fund for hazardous weather environments
-- Enterprise partnerships and institutional adoption
-
-### Phase 4 (Q1 -Q4 2026)
-- Cross-chain integration for broader accessibility
-- Advanced prediction algorithms based on historical data
-- Carbon credit integration for environmental impact
-- Global climate data marketplace
-
-## Contributing
-
-We welcome contributions from the community! Here's how you can help:
-
-### Development Areas
-- Frontend UI/UX improvements and mobile responsiveness
-- Smart contract optimizations and gas efficiency
-- Validation algorithm enhancements
-- Security audits and bug fixes
-- Documentation updates and translations
-- Integration with weather APIs and external data sources
-
-### Contribution Process
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Follow TypeScript and Solidity best practices
-4. Write comprehensive tests for new features
-5. Update documentation for changes
-6. Commit with clear messages (`git commit -m 'Add amazing feature'`)
-7. Push to branch (`git push origin feature/amazing-feature`)
-8. Open a Pull Request with detailed description
-
-### Code Standards
-- Use existing UI components from shadcn/ui
-- Follow OpenZeppelin standards for smart contracts
-- Implement proper error handling and validation
-- Add security considerations for all functions
-- Test thoroughly on testnet before mainnet deployment
-
-## Security Considerations
-
-- Smart contracts audited by professional security firms
-- Multi-signature wallet for critical contract upgrades
-- Time locks on sensitive administrative functions
-- Community governance for major platform changes
-- Active bug bounty program with responsible disclosure
-- Regular security reviews and penetration testing
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-- OpenZeppelin for secure smart contract libraries
-- BlockDAG for blockchain infrastructure and BDAG token
-- Community contributors, validators, and reporters
-- Weather data providers for validation references
-- Security auditors and the broader Web3 community
+- **Requirements**: DAO membership, 1000 CLT, 100 BDAG stake.
+- **Abilities**: Submit and validate reports, participate in DAO.
+- **Rewards**: Report rewards + validation rewards.
+- **Governance**: Full DAO voting rights.
 
 ---
 
-**Disclaimer**: This platform is experimental and involves financial risk. Users should understand blockchain technology and cryptocurrency risks. BDAG tokens are locked for 60 days upon staking. Always verify weather data from multiple sources for critical decisions. Participate responsibly and within your financial means.
+## Token Economy
+
+### CLT Token
+- **Total Supply**: 1 billion tokens.
+- **Distribution**: Minted for staking and rewards.
+- **Initial Mint**: 1000 CLT for 100 BDAG stake.
+- **Report Rewards**: 20 CLT per validated report.
+- **DAO Fee**: 1000 CLT for membership.
+
+### BDAG Token Staking
+- **Minimum Stake**: 100 BDAG.
+- **Lock Period**: 60 days.
+- **Benefits**: CLT minting, DAO access, platform roles.
+- **Unstaking**: Removes DAO membership and Validator status.
+
+---
+
+## Staking System
+- **Process**: Stake 100 BDAG via `stakeBDAG`, receive 1000 CLT.
+- **Lock Period**: 60 days.
+- **Benefits**: Enables Reporter role, DAO eligibility, and rewards.
+- **Unstaking**: Via `unstakeBDAG`, notifies DAO for membership removal.
+
+---
+
+## Validation Process
+- **Submission**: Reporters submit via `createReport`.
+- **Voting**: Validators vote within 24 hours via `voteOnReport`.
+- **Consensus**: >51% agreement finalizes reports early; otherwise, finalized after 24 hours.
+- **Rewards**: 20 CLT for validated reports, distributed via `distributeRewards`.
+
+---
+
+## DAO Governance
+- **Membership**: Requires 100 BDAG stake, 1000 CLT fee.
+- **Proposals**: Created via `createProposal` (1-30 days duration).
+- **Voting**: After 1-hour delay, members vote via `vote`.
+- **Execution**: Proposals meeting 51% quorum execute via `executeProposal`.
+
+---
+
+## Security Features
+- **Smart Contracts**: ReentrancyGuard, Pausable, SafeMath, Ownable.
+- **Access Controls**: Role-based permissions, authorized minters.
+- **Emergency Features**: Contract pausing, admin withdrawals.
+- **Blacklisting**: Prevents malicious actors.
+
+---
+
+## Roadmap
+- **Phase 1 (Current)**: Core reporting, validation, DAO, and token system.
+- **Phase 2 (Q1 2026)**: Mobile app, analytics dashboard, API integrations.
+- **Phase 3 (Q2 2026)**: ML validation, NFT achievements, climate fund.
+- **Phase 4 (Q4 2026)**: Cross-chain support, prediction algorithms, carbon credits.
+
+---
+
+## Contributing
+- **Areas**: UI/UX, smart contract optimization, validation algorithms, security audits.
+- **Process**:
+  1. Fork repository.
+  2. Create feature branch (`git checkout -b feature/new-feature`).
+  3. Follow TypeScript/Solidity best practices.
+  4. Write tests and update documentation.
+  5. Submit Pull Request with detailed description.
+
+---
+
+## License
+MIT License - see [LICENSE](LICENSE) file.
+
+---
+
+## Acknowledgments
+- OpenZeppelin for secure contract libraries.
+- BlockDAG for blockchain infrastructure.
+- Community contributors and validators.
+- Weather API providers (e.g., OpenWeatherMap).
+- Security auditors and Web3 community.
+
+---
+
+**Disclaimer**: ClimaLink is experimental and involves financial risks. BDAG tokens are locked for 60 days upon staking. Verify weather data from multiple sources for critical decisions. Participate responsibly.

@@ -46,22 +46,23 @@ function QuickStakeActions() {
       try {
         setIsLoading(true)
         const tokenContract = getContract("TOKEN")
+        const bdagContract = getContract("BDAG")
         
-        if (!tokenContract) {
+        if (!tokenContract || !bdagContract) {
           setIsLoading(false)
           return
         }
 
         const [
           minimumStake,
-          userBalance,
+          userBDAGBalance,
           allowance,
           stakedAmount,
           autoMintAmount
         ] = await Promise.all([
           tokenContract.BDAG_STAKE_AMOUNT(),
-          tokenContract.balanceOf(account),
-          tokenContract.allowance(account, await tokenContract.getAddress()),
+          bdagContract.balanceOf(account), // Get BDAG balance from BDAG contract
+          bdagContract.allowance(account, await tokenContract.getAddress()), // Check BDAG allowance for TOKEN contract
           tokenContract.getStakedAmount(account),
           tokenContract.MINT_AMOUNT()
         ])
@@ -72,7 +73,7 @@ function QuickStakeActions() {
 
         setStakingInfo({
           minimumStake: minimumStakeFormatted,
-          availableBalance: ethers.formatEther(userBalance),
+          availableBalance: ethers.formatEther(userBDAGBalance),
           currentStake: ethers.formatEther(stakedAmount),
           hasApproval,
           allowance: allowanceFormatted,
@@ -99,17 +100,19 @@ function QuickStakeActions() {
     }
 
     const tokenContract = getContract("TOKEN")
+    const bdagContract = getContract("BDAG")
     
-    if (!tokenContract) {
-      throw new Error("Token contract not available")
+    if (!tokenContract || !bdagContract) {
+      throw new Error("Token contracts not available")
     }
 
+    // Approve the TOKEN contract to spend BDAG tokens
     const stakingAddress = await tokenContract.getAddress()
     const amountToApprove = ethers.parseEther(stakingInfo.minimumStake)
 
     setIsProcessing(true)
     try {
-      const tx = await tokenContract.approve(stakingAddress, amountToApprove)
+      const tx = await bdagContract.approve(stakingAddress, amountToApprove)
       await tx.wait()
       
       setTimeout(() => {
