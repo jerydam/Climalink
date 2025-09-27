@@ -157,30 +157,107 @@ ClimaLink is a decentralized platform that incentivizes accurate climate reporti
 ## Project Structure
 
 ```
-climalink/
-├── components/           # Reusable UI components
-│   ├── ui/              # Base UI components (buttons, cards, etc.)
-│   ├── dashboard/       # Dashboard-specific components
-│   ├── profile/         # User profile components
-│   ├── blockchain/      # Web3 integration components
-│   ├── navigation/      # Navigation components
-│   └── validation/      # Report validation components
-├── contexts/            # React context providers
-│   ├── role-context.tsx # User role management
-│   └── web3-context.tsx # Blockchain connection
-├── lib/                 # Utility libraries
-│   ├── contracts.ts     # Smart contract ABIs and addresses
-│   ├── web3.ts         # Web3 utility functions
-│   └── utils.ts        # General utilities
-├── app/                # Next.js app router pages
-│   ├── dashboard/      # Main dashboard
-│   ├── submit/         # Report submission
-│   ├── validate/       # Report validation
-│   ├── portfolio/      # Token management
-│   ├── profile/        # User profile
-│   └── blockchain/     # Blockchain interaction
-└── public/             # Static assets
-```
+Climalink/
+├── Readme.md
+├── backend/
+│   ├── .env
+│   ├── .gitignore
+│   ├── package.json
+│   ├── pnpm-lock.yaml
+│   ├── server.js
+│   ├── controllers/
+│   │   └── weatherController.js
+│   ├── routes/
+│   │   └── api.js
+│   └── services/
+│       └── weatherService.js
+├── frontend/
+│   ├── .gitignore
+│   ├── components.json
+│   ├── next.config.mjs
+│   ├── package.json
+│   ├── pnpm-lock.yaml
+│   ├── postcss.config.mjs
+│   ├── Readme.md
+│   ├── tsconfig.json
+│   ├── app/
+│   │   ├── favicon.ico
+│   │   ├── globals.css
+│   │   ├── layout.tsx
+│   │   ├── page.tsx
+│   │   ├── api/
+│   │   │   └── weather/
+│   │   ├── blockchain/
+│   │   │   └── page.tsx
+│   │   ├── create/
+│   │   │   └── page.tsx
+│   │   ├── dao/
+│   │   │   └── page.tsx
+│   │   ├── dashboard/
+│   │   │   └── page.tsx
+│   │   ├── portfolio/
+│   │   │   ├── loading.tsx
+│   │   │   └── page.tsx
+│   │   ├── predict/
+│   │   │   └── page.tsx
+│   │   ├── profile/
+│   │   │   └── page.tsx
+│   │   ├── submit/
+│   │   │   └── page.tsx
+│   │   └── validate/
+│   │       └── page.tsx
+│   ├── components/
+│   │   ├── back.tsx
+│   │   ├── mapnav.tsx
+│   │   ├── theme-provider.tsx
+│   │   ├── auth/
+│   │   │   └── role-guard.tsx
+│   │   ├── blockchain/
+│   │   ├── dao/
+│   │   ├── dashboard/
+│   │   ├── navigation/
+│   │   ├── portfolio/
+│   │   ├── profile/
+│   │   ├── submit/
+│   │   ├── ui/
+│   │   └── validation/
+│   │       └── ...
+│   ├── hooks/
+│   │   ├── use-contract.ts
+│   │   ├── use-mobile.ts
+│   │   └── use-toast.ts
+│   ├── lib/
+│   │   ├── contracts.ts
+│   │   ├── leaflet-fix.ts
+│   │   ├── roles.tsx
+│   │   ├── utils.ts
+│   │   └── web3.tsx
+│   ├── public/
+│   │   ├── placeholder-logo.png
+│   │   ├── placeholder-logo.svg
+│   │   ├── placeholder-user.jpg
+│   │   ├── placeholder.jpg
+│   │   └── placeholder.svg
+│   ├── styles/
+│   │   └── globals.css
+│   └── utils/
+│       └── fixLeafletIcons.ts
+├── smart contract/
+│   ├── .gitignore
+│   ├── .gitmodules
+│   ├── foundry.toml
+│   ├── README.md
+│   ├── lib/
+│   │   └── forge-std/
+│   ├── script/
+│   │   └── Counter.s.sol
+│   ├── src/
+│   │   ├── BdagToken.sol
+│   │   ├── climate.sol
+│   │   ├── dao.sol
+│   │   └── token.sol
+│   └── test/
+│       └── Counter.t.sol
 
 ## Usage Guide
 
