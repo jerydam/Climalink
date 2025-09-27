@@ -451,7 +451,7 @@ export function TransactionModal({
                 <Button variant="outline" onClick={handleClose} className="flex-1 bg-transparent">
                   Cancel
                 </Button>
-                <Button onClick={handleConfirm} className="flex-1 bg-climate-green hover:bg-climate-green/90">
+                <Button onClick={handleConfirm} className="">
                   {requiresApproval ? "Start Process" : "Confirm"}
                 </Button>
               </>
