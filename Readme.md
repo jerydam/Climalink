@@ -222,9 +222,9 @@ backend/
 ### Contract Addresses
 | Contract | Address | Purpose |
 |----------|---------|---------|
-| CLT Token | `0xb6147E56105f09086C1DC3eb7d6A595F1818b499` | ERC-20 reward token with staking. |
-| DAO Contract | `0x8FfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF` | Governance, voting, and membership. |
-| Climate Reports | `0x50AdE72a0bF3F424505c3828D140C976B99b7D06` | Report storage and validation. |
+| CLT Token | `0xfec48f1C2ea14e38cA56110b30598183563D252f` | ERC-20 reward token with staking. |
+| DAO Contract | `0x4Ba3437C60D83D4F8DCA2E62276c57ad6A2951b9` | Governance, voting, and membership. |
+| Climate Reports | `0x92D1B0Db9cF054487a31c55F68e38D323e4AA2fc` | Report storage and validation. |
 
 ### Key Contract Functions
 #### CLT Token Contract
