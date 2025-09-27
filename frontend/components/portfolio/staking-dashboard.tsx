@@ -491,6 +491,7 @@ export function StakingDashboard() {
                 <span>Governance participation and voting rights</span>
               </div>
             </div>
+            
           </div>
         </CardContent>
       </Card>
