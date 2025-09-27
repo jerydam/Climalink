@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, type ReactNode } from "react"
+import { useEffect, type ReactNode, useState } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import { useRole, type UserRole } from "@/lib/roles"
 import { useWeb3 } from "@/lib/web3"
@@ -9,13 +9,12 @@ import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { TransactionModal } from "@/components/blockchain/transaction-modal"
 import { Loader2, Users, FileText, AlertCircle, ShieldCheck, Coins } from "lucide-react"
-import { useState } from "react"
 
 interface RoleGuardProps {
   children: ReactNode
   requiredRole?: UserRole | UserRole[]
   fallbackPath?: string
-  allowStakerAccess?: boolean // Allow users with staked BDAG
+  allowStakerAccess?: boolean
 }
 
 export function RoleGuard({ 
@@ -28,6 +27,8 @@ export function RoleGuard({
   const { isConnected, isCorrectNetwork } = useWeb3()
   const router = useRouter()
   const pathname = usePathname()
+  const [hasCheckedConnection, setHasCheckedConnection] = useState(false)
+  const [redirectTimer, setRedirectTimer] = useState<NodeJS.Timeout | null>(null)
 
   // Special handling for different pages
   const isDAOPage = pathname?.includes('/dao')
@@ -35,12 +36,63 @@ export function RoleGuard({
   const isPortfolioPage = pathname?.includes('/portfolio')
   const isProfilePage = pathname?.includes('/profile')
   const isSubmitPage = pathname?.includes('/submit')
+  const isLandingPage = pathname === "/" || pathname === ""
+  const isDashboardPage = pathname?.includes('/dashboard')
 
+  // More careful redirect logic with proper delays
   useEffect(() => {
-    if (!isLoading && !isConnected) {
-      router.push(fallbackPath)
+    // Don't redirect if we're already on the landing page or dashboard
+    if (isLandingPage || isDashboardPage) {
+      setHasCheckedConnection(true)
+      return
     }
-  }, [isConnected, isLoading, router, fallbackPath])
+
+    // Clear any existing timer
+    if (redirectTimer) {
+      clearTimeout(redirectTimer)
+      setRedirectTimer(null)
+    }
+
+    // Wait for initial loading to complete
+    if (isLoading) {
+      return
+    }
+
+    // Only start checking connection after a delay to avoid premature redirects
+    if (!hasCheckedConnection) {
+      const checkTimer = setTimeout(() => {
+        setHasCheckedConnection(true)
+      }, 2000) // 2 second delay before checking
+      
+      setRedirectTimer(checkTimer)
+      return
+    }
+
+    // Only redirect if wallet was disconnected AFTER initial check
+    if (!isConnected && hasCheckedConnection) {
+      console.log("🔄 Wallet disconnected, redirecting to landing")
+      const redirectTimer = setTimeout(() => {
+        router.push(fallbackPath)
+      }, 1000) // 1 second delay before redirect
+      
+      setRedirectTimer(redirectTimer)
+    }
+
+    return () => {
+      if (redirectTimer) {
+        clearTimeout(redirectTimer)
+      }
+    }
+  }, [isConnected, isLoading, router, fallbackPath, hasCheckedConnection, isLandingPage, isDashboardPage])
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (redirectTimer) {
+        clearTimeout(redirectTimer)
+      }
+    }
+  }, [])
 
   // Determine if user has access based on smart rules
   const hasAccess = () => {
@@ -54,22 +106,18 @@ export function RoleGuard({
 
     // Special cases for different pages
     if (isDAOPage) {
-      // DAO page: Allow if user has staked (even if role isn't updated)
       return debugInfo.hasStaked || userRole === "dao_member"
     }
 
     if (isValidationPage) {
-      // Validation page: Allow validators, DAO members, or users with staked BDAG
       return userRole === "validator" || userRole === "dao_member" || debugInfo.hasStaked
     }
 
     if (isPortfolioPage || isProfilePage) {
-      // Portfolio/Profile: Allow any member or staker
       return isMember || debugInfo.hasStaked
     }
 
     if (isSubmitPage) {
-      // Submit page: Allow any member
       return isMember
     }
 
@@ -82,19 +130,21 @@ export function RoleGuard({
     return isMember
   }
 
-  // Show loading state
-  if (isLoading) {
+  // Show loading state with longer wait time
+  if (isLoading || !hasCheckedConnection) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
-          <p className="text-muted-foreground">Checking access permissions...</p>
+          <p className="text-muted-foreground">
+            {isLoading ? "Loading user data..." : "Checking wallet connection..."}
+          </p>
         </div>
       </div>
     )
   }
 
-  // Not connected to wallet
+  // Not connected to wallet - show prompt instead of immediate redirect
   if (!isConnected) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -105,7 +155,10 @@ export function RoleGuard({
           <CardContent className="text-center">
             <AlertCircle className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
             <p className="text-muted-foreground mb-4">Please connect your wallet to access this page.</p>
-            <Button onClick={() => router.push("/")}>Go to Home</Button>
+            <div className="space-y-2">
+              <Button onClick={() => router.push("/")}>Connect Wallet</Button>
+              <Button variant="outline" onClick={() => router.back()}>Go Back</Button>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -123,7 +176,7 @@ export function RoleGuard({
           <CardContent className="text-center">
             <AlertCircle className="h-12 w-12 mx-auto mb-4 text-amber-500" />
             <p className="text-muted-foreground mb-4">Please connect to the BlockDAG network.</p>
-            <Button onClick={() => router.push("/")}>Go to Home</Button>
+            <Button onClick={() => window.location.reload()}>Retry Connection</Button>
           </CardContent>
         </Card>
       </div>
@@ -172,17 +225,29 @@ function AccessDenied({
   }
 
   const handleStakeAndUpgrade = async (): Promise<string> => {
-    await stakeBDAG()
-    
-    // If on validation page, join as validator
-    if (currentPage?.includes('/validate')) {
-      setTimeout(async () => {
-        await joinAsValidator()
-        window.location.reload()
-      }, 2000)
+    try {
+      await stakeBDAG()
+      
+      // If on validation page, join as validator
+      if (currentPage?.includes('/validate')) {
+        setTimeout(async () => {
+          try {
+            await joinAsValidator()
+            // Force page refresh after successful upgrade
+            setTimeout(() => {
+              window.location.reload()
+            }, 2000)
+          } catch (error) {
+            console.error("Failed to join as validator:", error)
+          }
+        }, 2000)
+      }
+      
+      return "Staking completed successfully"
+    } catch (error) {
+      console.error("Failed to stake:", error)
+      throw error
     }
-    
-    return "Staking completed"
   }
 
   // Special handling for reporters trying to access validation
@@ -271,24 +336,41 @@ function JoinPrompt({ currentPage }: { currentPage?: string }) {
   const { joinAsReporter, joinAsValidator, joinDAO, stakeBDAG, debugInfo } = useRole()
   const router = useRouter()
   const [showStakeModal, setShowStakeModal] = useState(false)
+  const [isProcessing, setIsProcessing] = useState(false)
 
   const handleJoinReporter = async () => {
+    if (isProcessing) return
+    
+    setIsProcessing(true)
     try {
       await joinAsReporter()
-      window.location.reload()
+      // Wait for transaction to complete, then redirect
+      setTimeout(() => {
+        router.push("/dashboard")
+      }, 3000)
     } catch (error) {
       console.error("Failed to join as reporter:", error)
       alert("Failed to join as reporter. Please try again.")
+    } finally {
+      setIsProcessing(false)
     }
   }
 
   const handleJoinValidator = async () => {
+    if (isProcessing) return
+    
+    setIsProcessing(true)
     try {
       await joinAsValidator()
-      window.location.reload()
+      // Wait for transaction to complete, then redirect
+      setTimeout(() => {
+        router.push("/dashboard")
+      }, 3000)
     } catch (error) {
       console.error("Failed to join as validator:", error)
       alert("Failed to join as validator. Please try again.")
+    } finally {
+      setIsProcessing(false)
     }
   }
 
@@ -297,13 +379,20 @@ function JoinPrompt({ currentPage }: { currentPage?: string }) {
       // Stake BDAG first
       await stakeBDAG()
       
-      // Then join as validator
+      // Then join as validator after a delay
       setTimeout(async () => {
-        await joinAsValidator()
-        window.location.reload()
+        try {
+          await joinAsValidator()
+          // Redirect to dashboard after successful completion
+          setTimeout(() => {
+            router.push("/dashboard")
+          }, 2000)
+        } catch (error) {
+          console.error("Failed to join as validator:", error)
+        }
       }, 2000)
       
-      return "Staking and joining as validator..."
+      return "Staking BDAG and joining as validator..."
     } catch (error) {
       console.error("Failed to stake and join:", error)
       throw error
@@ -311,15 +400,25 @@ function JoinPrompt({ currentPage }: { currentPage?: string }) {
   }
 
   const handleJoinDAO = async () => {
+    if (isProcessing) return
+    
+    setIsProcessing(true)
     try {
       if (!debugInfo.hasStaked) {
         await stakeBDAG()
+        // Wait for staking to complete
+        await new Promise(resolve => setTimeout(resolve, 2000))
       }
       await joinDAO()
-      window.location.reload()
+      // Wait for transaction to complete, then redirect
+      setTimeout(() => {
+        router.push("/dashboard")
+      }, 3000)
     } catch (error) {
       console.error("Failed to join DAO:", error)
       alert("Failed to join DAO. Make sure you have enough CLT tokens.")
+    } finally {
+      setIsProcessing(false)
     }
   }
 
@@ -380,8 +479,16 @@ function JoinPrompt({ currentPage }: { currentPage?: string }) {
                   <li>• Access reporting dashboard</li>
                   <li>• View community data</li>
                 </ul>
-                <Button onClick={handleJoinReporter} className="w-full">
-                  <FileText className="h-4 w-4 mr-2" />
+                <Button 
+                  onClick={handleJoinReporter} 
+                  className="w-full"
+                  disabled={isProcessing}
+                >
+                  {isProcessing ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <FileText className="h-4 w-4 mr-2" />
+                  )}
                   Join as Reporter
                 </Button>
               </CardContent>
@@ -407,6 +514,7 @@ function JoinPrompt({ currentPage }: { currentPage?: string }) {
                 <Button 
                   onClick={() => setShowStakeModal(true)}
                   className="w-full bg-amber-600 hover:bg-amber-700"
+                  disabled={isProcessing}
                 >
                   <Coins className="h-4 w-4 mr-2" />
                   Stake & Become Validator
@@ -439,9 +547,13 @@ function JoinPrompt({ currentPage }: { currentPage?: string }) {
                 <Button 
                   onClick={handleJoinDAO} 
                   className="w-full"
-                  disabled={parseFloat(debugInfo.cltBalance) < parseFloat(debugInfo.membershipFee)}
+                  disabled={parseFloat(debugInfo.cltBalance) < parseFloat(debugInfo.membershipFee) || isProcessing}
                 >
-                  <Users className="h-4 w-4 mr-2" />
+                  {isProcessing ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Users className="h-4 w-4 mr-2" />
+                  )}
                   Join DAO
                 </Button>
               </CardContent>
