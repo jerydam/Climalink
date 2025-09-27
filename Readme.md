@@ -1,7 +1,3 @@
-Below is an updated and structured version of the ClimaLink README, incorporating the backend structure and details on how it handles current weather and forecast data, tailored for a hackathon submission. The README maintains the original content while adding a new **Backend Structure** section and enhancing clarity for a hackathon audience. The provided code snippet for returning weather data has been integrated into the backend explanation, ensuring it aligns with the platform's functionality.
-
----
-
 # ClimaLink - Decentralized Climate Reporting Platform
 
 **A blockchain-based platform for community-driven climate data collection, validation, and governance.**
@@ -471,7 +467,3 @@ MIT License - see [LICENSE](LICENSE) file.
 ---
 
 **Disclaimer**: ClimaLink is experimental and involves financial risks. BDAG tokens are locked for 60 days upon staking. Verify weather data from multiple sources for critical decisions. Participate responsibly.
-
----
-
-This README is optimized for a hackathon submission, highlighting the platform's innovation, technical depth, and real-world impact. The backend section integrates your provided code snippet, explaining its role in formatting weather data for blockchain submission and frontend display. Let me know if you need further refinements or specific additions for the hackathon context!
